@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 style="text-align: center;">Текущее положение</h2>
+<table style="margin: 0px auto; width: 100%;">
+    <tr>
+        <th>Пользователь</th>
+        {% for task in all_tasks %}
+            <th>{{ task.tid }}</th>
+        {% endfor %}
+        <th>Баллы</th>
+    </tr>
+    {% for user, all_points in new_items %}
+        {% set points = items[user] %}
+        <tr>
+            <td>{{ user }}</td>
+            {% for task in all_tasks %}
+                {% if points.get(task.tid, 0.0) == 100 %}
+                    <td><strong>{{ points.get(task.tid, "-") }}</strong></td>
+                {% else %}
+                    <td>{{ points.get(task.tid, "-") }}</td>
+                {% endif %}
+            {% endfor %}
+            <th>{{ all_points }}</th>
+        </tr>
+    {% endfor %}
+</table>
+{% endblock %}

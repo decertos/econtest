@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+<table>
+    <tr>
+        <th>ID</th>
+        <th>Задача</th>
+        <th>Вердикт</th>
+        <th>Тест</th>
+        <th>Баллы</th>
+        <th>Время</th>
+        <th>Дата</th>
+        <th>Протокол</th>
+    </tr>
+    {% for submission in submissions[::-1] %}
+    <tr>
+        {% set bcolor = bcolors.get(submission.verdict.split()[0], "#f57d8f") %}
+        {% set color = colors.get(submission.verdict.split()[0], "#6b0111") %}
+        <td style="background-color: {{ bcolor }}">{{ submission.s_id }}</td>
+        <td style="background-color: {{ bcolor }}">{{ submission.tid }}. {{ submission.task.title }}</td>
+        <td style="color: {{ color }}; background-color: {{ bcolor }}">{{ verdicts[submission.verdict.split()[0]] }}</td>
+        <td style="background-color: {{ bcolor }}">{{ submission.verdict.split()[1] }}</td>
+        <td style="background-color: {{ bcolor }}">{{ submission.points }}</td>
+        <td style="background-color: {{ bcolor }}">{{ submission.execution_time }} мс</td>
+        <td style="background-color: {{ bcolor }}">{{ submission.time.strftime("%d.%m.%y %H:%M:%S") }}</td>
+        <td style="background-color: {{ bcolor }}"><a href="/submission_view/{{ submission.s_id }}">Просмотр</a></td>
+    </tr>
+    {% endfor %}
+</table>
+<p>Пояснение вердиктов чекера: <a href="/verdicts_info">здесь</a></p>
+<p>Сейчас используется потоков для проверки: {{ threads_count }}/{{ max_threads_count }}</p>
+<p>Сейчас решений в очереди: {{ queued_count }}</p>
+{% endblock %}

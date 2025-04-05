@@ -1,0 +1,91 @@
+<!DOCTYPE HTML>
+<html>
+  <head lang="en">
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="/static/styles.css">
+    <title>{{ title }} | {{ contest_title }}</title>
+    <style>
+      /* Основные стили контейнера */
+      .container {
+        max-width: 1000px;
+        margin: 20px auto;
+        padding: 20px;
+        background-color: #f8f8f8;  /* Слегка затемненный фон */
+        border: 1px solid #e0e0e0;
+        border-radius: 5px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+
+      /* Сохранение оригинального стиля кнопок */
+      .title {
+        text-align: center;
+        color: #5c6ac4;
+      }
+
+      hr {
+        border: 0;
+        height: 1px;
+        background-color: #ddd;
+        margin: 10px 0;
+      }
+
+      .navbar {
+        text-align: center;
+      }
+
+      .navbar_li {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        display: inline;
+        float: left;
+      }
+
+      .navbar_a {
+        padding: 8px;
+        text-align: center;
+        text-decoration: none;
+        color: #385f3b;
+        border-radius: 10px;
+      }
+
+      .navbar_a:hover {
+        background-color: #72c478;
+        color: #1d321e;
+      }
+
+      .username_a {
+        padding: 8px;
+        text-align: center;
+        text-decoration: none;
+        color: #006600;
+        border-radius: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="title">{{ contest_title }}</h1>
+    <hr>
+    <nav class="navbar">
+      {% if not current_user.is_authenticated %}
+        <a href="/login" class="navbar_a"><b>Вход</b></a>
+      {% else %}
+        <a href="/logout" class="username_a"><b>{{ current_user.login }}</b></a>
+      {% endif %}
+      <a href="/contest/{{ contest }}/index" class="navbar_a"><b>Инфо</b></a>
+      <a href="/contest/{{ contest }}/submit" class="navbar_a"><b>Отослать</b></a>
+      <a href="/contest/{{ contest }}/tasks" class="navbar_a"><b>Задачи</b></a>
+      <a href="/contest/{{ contest }}/status" class="navbar_a"><b>Статус</b></a>
+      <a href="/contest/{{ contest }}/standings" class="navbar_a"><b>Положение</b></a>
+      <a href="/contest/{{ contest }}/submissions" class="navbar_a"><b>Мои посылки</b></a>
+    </nav>
+    <hr>
+
+    <main role="main" class="container">
+      {% block content %}{% endblock %}
+      <hr>
+      <p>econtest v2.0 (27.03.2025 16:43:30)</p>
+      <p>Время на сервере: {{ now_time.strftime("%d.%m.%Y %H:%M:%S") }} (UTC)</p>
+    </main>
+  </body>
+</html>

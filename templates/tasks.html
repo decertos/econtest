@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 style="text-align: center">Задачи</h2>
+<table style="margin: 0px auto; width: 100%;">
+    <tr style="text-align: center;">
+        <th>ID</th>
+        <th>Название</th>
+        <th>Решений</th>
+    </tr>
+    {% for task in tasks %}
+    <tr>
+        <th>{{ task.tid }}</th>
+        <td><a href="/task/{{ task.tid }}">{{ task.title }}</a></td>
+        <td>{{ accs[task.tid] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

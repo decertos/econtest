@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Посылка #{{ submission.s_id }}</h1>
+<table>
+    <tr><td><i>Язык: </i></td><td>{{ submission.language }}</td></tr>
+    <tr><td><i>Отправлена: </i></td><td>{{ submission.time.strftime("%d.%m.%y %H:%M:%S") }}</td>
+    <tr><td><i>Автор: </i></td><td>{{ submission.user.login }}</td>
+    <tr><td><i>Задача: </i></td><td>{{ submission.task.tid }}. {{ submission.task.title }}</td>
+    <tr><td><i>Вердикт: </i></td><td>{{ submission.verdict }}</td>
+    <tr><td><i>Баллы: </i></td><td>{{ submission.points }}</td></tr>
+    <tr><td><i>Максимальное время исполнения: </i></td><td>{{ submission.execution_time }} ms</td></tr>
+</table>
+<p><i>Код посылки: </i><textarea readonly>{{ "\n".join(submission.code.split("\n")) }}</textarea></p>
+<p>Детальная информация о тестах</p>
+{% for i, test in verdicts %}Test {{ i }}: {{ test[0] }} with time {{ test[1] }} ms<br>
+{% endfor %}
+{% endblock %}

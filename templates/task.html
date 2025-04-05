@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <head>
+        <link rel="stylesheet" type="text/css" href="../static/styles.css">
+    </head>
+    <h1 style="text-align: center">{{ task.tid }}. {{ task.title }}</h1>
+    <p style="text-align: center"><i>Ограничение по времени: </i>{{ task.time_limit }} секунд</p>
+    <p style="text-align: center"><i>Ограничение по памяти: </i>{{ task.memory_limit }} МБ</p>
+
+    <p>{{ task.statement }}</p>
+    <h3><b>Формат входных данных</b></h3>
+    <p>{{ task.input_spec }}</p>
+    <h3><b>Формат выходных данных</b></h3>
+    <p>{{ task.output_spec }}</p>
+
+    <a href="/contest/{{ contest }}/submit?task_id={{ task.tid }}">Отправить решение</a>
+
+    {% if task.mode == 0 %}
+    <i>Эта задача с проверкой до первой ошибки</i>
+    {% elif task.mode == 1 %}
+    <i>Эта задача с проверкой всех тестов</i>
+    {% endif %}
+{% endblock %}
