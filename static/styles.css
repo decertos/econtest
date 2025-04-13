@@ -51,7 +51,7 @@ table, th, td {
     max-width: 1000px;
     margin: 20px auto;
     padding: 20px;
-    background-color: #f8f8f8;
+    background-color: #f8f8f8;  /* Слегка затемненный фон */
     border: 1px solid #e0e0e0;
     border-radius: 5px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);

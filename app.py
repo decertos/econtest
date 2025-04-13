@@ -723,5 +723,7 @@ def verdicts_info():
     return render_template("verdicts_info.html", now_time=datetime.datetime.now())
 
 
-db_session.global_init("/home/decert/mysite/db/econtest.db")
-app.register_blueprint(blueprint)
+if __name__ == "__main__":
+    db_session.global_init("db/econtest.db")
+    app.register_blueprint(blueprint)
+    app.run(host="0.0.0.0", port=8080)
