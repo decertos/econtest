@@ -1,11 +1,10 @@
-<!DOCTYPE HTML>
-<html>
-  <head lang="en">
+<head lang="en">
     <meta charset="UTF-8">
     <link rel="stylesheet" type="text/css" href="/static/styles.css">
     <title>{{ title }} | {{ contest_title }}</title>
-  </head>
-  <body>
+</head>
+
+<body>
     <h1 class="title">{{ contest_title }}</h1>
     <hr>
     <nav class="navbar">
@@ -14,20 +13,15 @@
       {% else %}
         <a href="/logout" class="username_a"><b>{{ current_user.login }}</b></a>
       {% endif %}
-      <a href="/contest/{{ contest }}/index" class="navbar_a"><b>Инфо</b></a>
-      <a href="/contest/{{ contest }}/submit" class="navbar_a"><b>Отослать</b></a>
-      <a href="/contest/{{ contest }}/tasks" class="navbar_a"><b>Задачи</b></a>
-      <a href="/contest/{{ contest }}/status" class="navbar_a"><b>Статус</b></a>
-      <a href="/contest/{{ contest }}/standings" class="navbar_a"><b>Положение</b></a>
-      <a href="/contest/{{ contest }}/submissions" class="navbar_a"><b>Мои посылки</b></a>
+      <a href="/register" class="navbar_a"><b>Регистрация</b></a>
+      <a href="/contests" class="navbar_a"><b>Контесты</b></a>
+      <a href="/api/" class="navbar_a"><b>API</b></a>
     </nav>
     <hr>
-
     <main role="main" class="container">
       {% block content %}{% endblock %}
       <hr>
       <p>Время на сервере: {{ now_time.strftime("%d.%m.%Y %H:%M:%S") }} (UTC)</p>
       <p>econtest v2.4 (12.04.2025 22:32)</p>
     </main>
-  </body>
-</html>
+</body>

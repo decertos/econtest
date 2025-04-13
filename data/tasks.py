@@ -1,10 +1,11 @@
 import sqlalchemy
 from .db_session import SqlAlchemyBase
+from sqlalchemy_serializer import SerializerMixin
 from sqlalchemy import orm
 import json
 
 
-class Task(SqlAlchemyBase):
+class Task(SqlAlchemyBase, SerializerMixin):
     __tablename__ = "tasks"
 
     tid = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)

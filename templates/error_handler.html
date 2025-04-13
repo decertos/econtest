@@ -1,0 +1,18 @@
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" type="text/css" href="/static/styles.css">
+</head>
+<body>
+    <h1 class="title">EContest</h1>
+    <hr>
+    <h2>{{ text }}</h2>
+    <p>{{ text1 }}</p>
+    <p>You can return to the <a href="/">main page</a> or try again.</p>
+    <hr>
+    <p>Request URL: {{ request.full_path }}<br>
+    Method: {{ request.method }}<br>
+    HTTP Code: {{ http_code }}<br>
+    User Agent: {{ request.user_agent }}<br>
+    Server Time: {{ now_time.strftime("%d.%m.%Y %H:%M:%S") }}</p>
+</body>

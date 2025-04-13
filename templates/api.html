@@ -1,0 +1,47 @@
+{% extends "mains_base.html" %}
+
+{% block content %}
+<h1>API</h1>
+<p>EContest поддерживает API для использования его в любых целях.</p>
+<p>Все результаты запросов к API отправляются в формате JSON. JSON выглядит так: {"status": "...", "error/response"},
+где <b>status</b> будет указывать на статус ("ok" - запрос выполнен успешно, "error" - запрос выполнен с ошибкой).
+Если status будет error, то в ключе error будет сообщение об ошибке. Иначе (при статусе "ok") в ключе "response" будет словарь с необходимыми значениями.</p>
+<p>Все запросы к API должны начинаться на /api/.../</p>
+<table>
+    <tr>
+        <th>Адрес</th>
+        <th>На выходе</th>
+        <th>Формат JSON</th>
+    </tr>
+    <tr>
+        <td>/api/user/</td>
+        <td>Все пользователи</td>
+        <td>{user_id: {"user_id", "login"}}</td>
+    </tr>
+    <tr>
+        <td>/api/user/user_id(int)/</td>
+        <td>Данные пользователя по id</td>
+        <td>"user_id", "login"</td>
+    </tr>
+    <tr>
+        <td>/api/task/</td>
+        <td>Все задачи</td>
+        <td>{task_id: {"tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode", "contest_id"}}</td>
+    </tr>
+    <tr>
+        <td>/api/task/task_id(int)/</td>
+        <td>Данные задачи по id</td>
+        <td>"tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode", "contest_id"</td>
+    </tr>
+    <tr>
+        <td>/api/contest/</td>
+        <td>Все контесты</td>
+        <td>{contest_id: "cid", "title", "start_time", "end_time"}</td>
+    </tr>
+    <tr>
+        <td>/api/contest/contest_id(int)/</td>
+        <td>Данные определённого контеста</td>
+        <td>"cid", "title", "start_time", "end_time"</td>
+    </tr>
+</table>
+{% endblock %}

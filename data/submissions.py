@@ -2,9 +2,10 @@ import sqlalchemy
 from .db_session import SqlAlchemyBase
 import datetime
 from sqlalchemy import orm
+from sqlalchemy_serializer import SerializerMixin
 
 
-class Submission(SqlAlchemyBase):
+class Submission(SqlAlchemyBase, SerializerMixin):
     __tablename__ = "submissions"
 
     s_id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
