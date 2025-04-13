@@ -1,6 +1,5 @@
-from flask import abort, Flask, redirect, render_template, request
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from flask import abort, Flask, redirect, render_template, request, jsonify
+import flask
 
 from data import db_session
 from data.users import User
@@ -15,6 +14,7 @@ from wtforms.validators import EqualTo, DataRequired
 from flask_login import LoginManager, current_user, login_user, logout_user, login_required
 
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.exceptions import HTTPException
 
 from collections import deque
 import subprocess
@@ -25,6 +25,9 @@ import time
 import json
 import sys
 import os
+
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 
 MODE_FULL_CHECK = 0
@@ -215,11 +218,17 @@ class Checker:
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "301f9c4c690b99e45d0e9504f3656d654a2710c549428e601e609cddf2614ef5"
-limiter = Limiter(get_remote_address, app=app, default_limits=["10 per minute"])
 login_manager = LoginManager()
 login_manager.init_app(app)
 
+limiter = Limiter(
+    get_remote_address,
+    app=app
+)
+
 checker = Checker()
+
+blueprint = flask.Blueprint("econtest_api", __name__, template_folder="templates")
 
 
 @login_manager.user_loader
@@ -266,12 +275,135 @@ class CreateTaskForm(FlaskForm):
 
 
 @app.route("/")
+@app.route("/index")
 def main_page():
-    return redirect("/index")
+    return redirect("/contests")
+
+
+CODES = {"404 Not Found": ("404 Не найдено", "Запрашиваемый URL-адрес не был найден на сервере.", "Запрашиваемый URL-адрес не был найден на сервере. Если Вы ввели URL-адрес вручную, проверьте свое правописание и попробуйте еще раз."),
+         "401 Unauthorized": ("401 Не авторизован", "Сервер не смог убедиться, что Вам разрешено получить доступ к запрашиваемому URL-адресу", "Сервер не смог убедиться, что Вам разрешено получить доступ к запрошенному URL-адресу. Вы либо предоставили неправильные учетные данные (например, неправильный пароль), либо Ваш браузер не понимает, как предоставить необходимые учетные данные."),
+         "403 Forbidden": ("403 Доступ запрещён", "У вас нет разрешения на доступ к запрошенному ресурсу", "У вас нет разрешения на доступ к запрошенному ресурсу. Он либо защищен от чтения, либо не читается сервером.")}
+
+
+@app.errorhandler(HTTPException)
+def error_handler(code):
+    code = str(code)
+    if code.startswith("401"):
+        return redirect("/login")
+    if code.startswith("429"):
+        print(code, file=sys.stderr)
+        rate_limit = code[code.find(":") + 2:]
+        return f'<p>Too many requests. Wait for a minute and try again.<br>Rate limit for this page is {rate_limit}.</p> <p>Слишком много запросов. Подождите минуту и попробуйте ещё раз.<br>Ограничение запросов на эту страницу: {rate_limit.replace("per", "в").replace("minute", "минуту")}.</p>'
+    if "/api/" in request.full_path:
+        return jsonify({"status": "error", "error": code})
+    if "ru" in request.accept_languages:
+        title, text, text1 = CODES.get(code[:code.find(":")], (code[:code.find(":")], code[code.find(":") + 2:code.find(".")], code[code.find(":") + 2:]))
+    else:
+        title, text, text1 = code[:code.find(":")], code[code.find(":") + 2:code.find(".")], code[code.find(":") + 2:]
+    return render_template("error_handler.html", title=title, text=text, text1=text1, request=request, http_code=code[:code.find(":")], now_time=datetime.datetime.now())
+
+
+# API
+@app.route("/api/")
+def api():
+    return render_template("api.html", title="Главная страница", contest_title="EContest API", now_time=datetime.datetime.now())
+
+
+@blueprint.route("/api/contest/", methods=["GET", "POST"])
+def api_contests():
+    if request.method == "POST":
+        return jsonify({"status": "error", "error": "method not realized"})
+    db_sess = db_session.create_session()
+    contests = db_sess.query(Contest).all()
+    data = {"status": "ok", "response": {}}
+    for contest in contests:
+        data["response"][str(contest.cid)] = contest.to_dict(only=("cid", "title", "start_time", "end_time"))
+    db_sess.close()
+    return jsonify(data)
+
+
+@blueprint.route("/api/contest/<int:contest_id>/", methods=["GET", "POST"])
+def api_contests_id(contest_id):
+    if request.method == "POST":
+        return jsonify({"status": "error", "error": "method not realized"})
+    db_sess = db_session.create_session()
+    contest = db_sess.query(Contest).filter(Contest.cid == contest_id).first()
+    if not contest:
+        return jsonify({"status": "error", "error": "not found"})
+    data = {}
+    data["response"] = contest.to_dict(only=("cid", "title", "start_time", "end_time"))
+    data["status"] = "ok"
+    return jsonify(data)
+
+
+@blueprint.route("/api/task/", methods=["GET", "POST"])
+def api_tasks():
+    if request.method == "POST":
+        return jsonify({"status": "error", "error": "method not realized"})
+    db_sess = db_session.create_session()
+    tasks = db_sess.query(Task).all()
+    data = {"status": "ok", "response": {}}
+    for task in tasks:
+        data["response"][str(task.tid)] = task.to_dict(only=("tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode", "contest_id"))
+    db_sess.close()
+    return jsonify(data)
+
+
+@blueprint.route("/api/task/<int:task_id>", methods=["GET", "POST"])
+def api_tasks_id(task_id):
+    if request.method == "POST":
+        return jsonify({"status": "error", "error": "method not realized"})
+    db_sess = db_session.create_session()
+    task = db_sess.query(Task).filter(Task.tid == task_id).first()
+    if not task:
+        return jsonify({"status": "error", "error": "not found"})
+    data = {"status": "ok", "response": task.to_dict(only=("tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode", "contest_id"))}
+    db_sess.close()
+    return data
+
+
+@blueprint.route("/api/admin/task_test_cases/<int:task_id>/")
+def api_admin_task_test_cases(task_id):
+    return jsonify({"status": "error", "error": "you are not allowed to enter this resource"})
+    if request.method == "POST":
+        return jsonify({"status": "error", "error": "method not realized"})
+    db_sess = db_session.create_session()
+    task = db_sess.query(Task).filter(Task.tid == task_id).first()
+    if not task:
+        return jsonify({"status": "error", "error": "not found"})
+    data = {"status": "ok", "response": task.to_dict(only=("test_cases", ))}
+    db_sess.close()
+    return data
+
+
+@blueprint.route("/api/user/")
+def api_user():
+    if request.method == "POST":
+        return jsonify({"status": "error", "error": "method not realized"})
+    db_sess = db_session.create_session()
+    users = db_sess.query(User).all()
+    data = {"status": "ok", "response": {}}
+    for user in users:
+        data["response"][str(user.uid)] = user.to_dict(only=("uid", "login"))
+    db_sess.close()
+    return jsonify(data)
+
+
+@blueprint.route("/api/user/<int:user_id>/")
+def api_user_id(user_id):
+    if request.method == "POST":
+        return jsonify({"status": "error", "error": "method not realized"})
+    db_sess = db_session.create_session()
+    user = db_sess.query(User).filter(User.uid == user_id).first()
+    if not user:
+        return jsonify({"status": "error", "error": "not found"})
+    data = {"status": "ok", "response": user.to_dict(only=("uid", "login"))}
+    db_sess.close()
+    return data
 
 
 @app.route("/contest/<int:contest>/index")
-@limiter.limit("20 per minute")
+@limiter.limit("50 per minute")
 def index_page(contest):
     db_sess = db_session.create_session()
     contest_data = db_sess.query(Contest).filter(contest == Contest.cid).first()
@@ -297,13 +429,13 @@ def index_page(contest):
     runs_string = ""
     if days:
         runs_string += f"{days}:"
-    runs_string += f"{days * 24 + seconds // 3600}:{str((seconds // 60) % 60).zfill(2)}:{str(seconds % 60).zfill(2)}"
+    runs_string += f"{seconds // 3600}:{str((seconds // 60) % 60).zfill(2)}:{str(seconds % 60).zfill(2)}"
     template = render_template("index.html", title="EContest", start_time=start_time, end_time=end_time, status=status, runs_string=runs_string, contest=contest, contest_title=contest_title, now_time=datetime.datetime.now())
     return template
 
 
 @app.route("/login", methods=["GET", "POST"])
-@limiter.limit("10 per minute")
+@limiter.limit("20 per minute")
 def login_form():
     form = LoginForm()
     if form.validate_on_submit():
@@ -312,19 +444,19 @@ def login_form():
         db_sess.close()
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
-            return redirect("/index")
+            return redirect("/contests")
     return render_template("login.html", title="Вход", form=form, contest_title="EContest", now_time=datetime.datetime.now())
 
 
 @app.route("/logout")
-@limiter.limit("10 per minute")
+@limiter.limit("20 per minute")
 def logout():
     logout_user()
-    return redirect("/")
+    return redirect("/contests")
 
 
 @app.route("/register", methods=["GET", "POST"])
-@limiter.limit("5 per minute")
+@limiter.limit("2 per minute")
 def register_form():
     form = RegisterForm()
     if form.validate_on_submit():
@@ -339,27 +471,32 @@ def register_form():
         db_sess.add(user)
         db_sess.commit()
         db_sess.close()
-        return redirect("/index")
+        return redirect("/contests")
     return render_template("register.html", title="Регистрация", form=form, contest_title="EContest", now_time=datetime.datetime.now())
 
 
 @app.route("/task/<int:task_id>")
-@limiter.limit("50 per minute")
+@limiter.limit("70 per minute")
 def get_task_data(task_id):
     db_sess = db_session.create_session()
     task = db_sess.query(Task).filter(Task.tid == task_id).first()
+    contest = task.contest;
+    if datetime.datetime.now() < task.contest.start_time:
+        db_sess.close()
+        return render_template("contest_access_denied", title="Доступ запрещён", contest=contest.cid,
+                               contest_title=contest.title, now_time=datetime.datetime.now())
     if not task:
         db_sess.close()
         return abort(404)
-    template = render_template("task.html", task=task, title=task.title, contest=task.contest_id, contest_title=task.contest.title, now_time=datetime.datetime.now())
+    template = render_template("task.html", task=task, title=task.title, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
     db_sess.close()
     return template
 
 
 @app.route("/add_task", methods=["GET", "POST"])
-@limiter.limit("5 per minute")
+@limiter.limit("50 per minute")
 def add_task():
-    if current_user.login != "admin":
+    if not current_user.is_authenticated or current_user.login != "admin":
         return abort(403)
     form = CreateTaskForm()
     if form.validate_on_submit():
@@ -391,9 +528,9 @@ def add_task():
 
 
 @app.route("/add_submission")
-@limiter.limit("5 per minute")
+@limiter.limit("50 per minute")
 def add_submission():
-    if current_user.login != "admin":
+    if not current_user.is_authenticated or current_user.login != "admin":
         return abort(403)
     db_sess = db_session.create_session()
     user = db_sess.query(User).first()
@@ -410,13 +547,15 @@ def add_submission():
 
 
 @app.route("/add_contest")
-@limiter.limit("5 per minute")
+@limiter.limit("50 per minute")
 def add_contest():
+    if not current_user.is_authenticated or current_user.login != "admin":
+        return abort(403)
     db_sess = db_session.create_session()
     contest = Contest()
-    contest.start_time = datetime.datetime(2025, 3, 27, 15, 0, 0)
+    contest.start_time = datetime.datetime(2025, 4, 21, 0, 0, 0)
     contest.end_time = contest.start_time + datetime.timedelta(days=365)
-    contest.title = "Test Contest"
+    contest.title = "[Архив] Отбор на смену 'Машинное обучение' Галактики 64"
     db_sess.add(contest)
     db_sess.commit()
     db_sess.close()
@@ -424,7 +563,7 @@ def add_contest():
 
 
 @app.route("/contest/<int:contest>/submit", methods=["GET", "POST"])
-@limiter.limit("50 per minute")
+@limiter.limit("30 per minute")
 @login_required
 def submit(contest):
     form = SubmissionForm()
@@ -434,7 +573,8 @@ def submit(contest):
     contest_object = db_sess.query(Contest).filter(Contest.cid == contest).first()
     contest_title = contest_object.title
     if datetime.datetime.now() < contest_object.start_time or contest_object.end_time < datetime.datetime.now():
-        return abort(403)
+        db_sess.close()
+        return render_template("contest_access_denied.html", title="Доступ запрещён", contest=contest, contest_title=contest_object.title, now_time=datetime.datetime.now())
     db_sess.close()
     if form.validate_on_submit():
         db_sess = db_session.create_session()
@@ -477,10 +617,13 @@ def get_submissions(contest):
 
 
 @app.route("/contest/<int:contest>/tasks")
-@limiter.limit("50 per minute")
+@limiter.limit("40 per minute")
 def tasks_function(contest):
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(Contest.cid == contest).first()
+    if datetime.datetime.now() < contest.start_time:
+        db_sess.close()
+        return render_template("contest_access_denied.html", title="Доступ запрещён", contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
     if datetime.datetime.now() < contest.start_time:
         return abort(403)
     all_tasks = contest.tasks
@@ -501,13 +644,13 @@ def tasks_function(contest):
 def contests():
     db_sess = db_session.create_session()
     contests = db_sess.query(Contest).all()
-    template = render_template("contests.html", title="Контесты", contests=contests, now_time=datetime.datetime.now())
+    template = render_template("contests.html", title="Контесты", contests=contests, now_time=datetime.datetime.now(), contest_title="EContest")
     db_sess.close()
     return template
 
 
 @app.route("/submission_view/<int:submission_id>")
-@limiter.limit("50 per minute")
+@limiter.limit("30 per minute")
 @login_required
 def submission_view(submission_id):
     db_sess = db_session.create_session()
@@ -525,7 +668,7 @@ def submission_view(submission_id):
 
 
 @app.route("/contest/<int:contest>/standings")
-@limiter.limit("5 per minute")
+@limiter.limit("15 per minute")
 def standings(contest):
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(contest == Contest.cid).first()
@@ -537,7 +680,7 @@ def standings(contest):
     items = list(data.items())
     new_items = [(username, sum(points.values())) for username, points in items]
     new_items.sort(key=lambda x: x[1], reverse=True)
-    template = render_template("standings1.html", title="Положение", items=new_items, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
+    template = render_template("standings.html", title="Положение", items=new_items, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
     db_sess.close()
     return template
 
@@ -561,6 +704,7 @@ def full_standings(contest):
 
 
 @app.route("/contest/<int:contest>/status")
+@limiter.limit("20 per minute")
 def status(contest):
     COLORS = {"ok": "#157002", "wa": "#6b0111", "tl": "#828003", "qu": "#000000", "te": "#116bfa", "ps": "#000000"}
     BCOLORS = {"ok": "#b0eba4", "wa": "#f57d8f", "tl": "#f7f44a", "qu": "#ffffff", "te": "#94bdff", "ps": "#cfd0d1"}
@@ -574,11 +718,10 @@ def status(contest):
 
 
 @app.route("/verdicts_info")
-@limiter.limit("150 per minute")
+@limiter.limit("30 per minute")
 def verdicts_info():
     return render_template("verdicts_info.html", now_time=datetime.datetime.now())
 
 
-if __name__ == "__main__":
-    db_session.global_init("db/econtest.db")
-    app.run(host="0.0.0.0", port=8080)
+db_session.global_init("/home/decert/mysite/db/econtest.db")
+app.register_blueprint(blueprint)

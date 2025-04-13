@@ -3,10 +3,11 @@ import datetime
 import sqlalchemy
 from .db_session import SqlAlchemyBase
 from sqlalchemy import orm
+from sqlalchemy_serializer import SerializerMixin
 import json
 
 
-class Contest(SqlAlchemyBase):
+class Contest(SqlAlchemyBase, SerializerMixin):
     __tablename__ = "contests"
 
     cid = sqlalchemy.Column(sqlalchemy.Integer, autoincrement=True, primary_key=True)
