@@ -274,6 +274,18 @@ class CreateTaskForm(FlaskForm):
     submit = SubmitField("Отправить")
 
 
+class TaskEditForm(FlaskForm):
+    title = StringField("Название")
+    statement = TextAreaField("Условие")
+    in_data = TextAreaField("Формат входных данных")
+    out_data = TextAreaField("Формат выходных данных")
+    time_limit = StringField("Ограничение по времени исполнения")
+    memory_limit = StringField("Ограничение по памяти")
+    contest = StringField("ID контеста")
+    mode = StringField("Режим (0 - все тесты, 1 - с частичным)")
+    submit = SubmitField("Отправить")
+
+
 @app.route("/")
 @app.route("/index")
 def main_page():
@@ -402,6 +414,29 @@ def api_user_id(user_id):
     return data
 
 
+# Content Management System
+@app.route("/cms/")
+def cms_main_page():
+    return render_template("cms/cms_base.html", now_time=datetime.datetime.now())
+
+
+@app.route("/cms/tasks/")
+def cms_tasks():
+    db_sess = db_session.create_session()
+    tasks = db_sess.query(Task).all()
+    template = render_template("cms/tasks.html", now_time=datetime.datetime.now())
+    db_sess.close()
+    return template
+
+
+@app.route("/cms/task/<int:task_id>/index/")
+def task_index():
+    pass
+
+
+
+
+
 @app.route("/contest/<int:contest>/index")
 @limiter.limit("50 per minute")
 def index_page(contest):
@@ -480,7 +515,7 @@ def register_form():
 def get_task_data(task_id):
     db_sess = db_session.create_session()
     task = db_sess.query(Task).filter(Task.tid == task_id).first()
-    contest = task.contest;
+    contest = task.contest
     if datetime.datetime.now() < task.contest.start_time:
         db_sess.close()
         return render_template("contest_access_denied", title="Доступ запрещён", contest=contest.cid,
@@ -488,7 +523,7 @@ def get_task_data(task_id):
     if not task:
         db_sess.close()
         return abort(404)
-    template = render_template("task.html", task=task, title=task.title, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
+    template = render_template("task_index.html", task=task, title=task.title, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
     db_sess.close()
     return template
 
