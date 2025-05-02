@@ -1,0 +1,31 @@
+{% extends "/cms/task_base.html" %}
+
+{% block content %}
+<h2>Добавление теста</h2>
+<p>Вы изменяете тест к задаче с ID {{ task_id }}</p>
+<form method="post" novalidate>
+    <div>
+        {{ form.csrf_token }}
+    </div>
+    <table>
+        <tr>
+            <td>
+                Входные данные
+            </td>
+            <td>
+                Выходные данные
+            </td>
+        </tr>
+        <tr>
+            <td>
+                {{ form.in_data() }}
+            </td>
+            <td>
+                {{ form.out_data() }}
+            </td>
+        </tr>
+    </table>
+    {{ form.submit() }}
+    {{ form.delete() }}
+</form>
+{% endblock %}

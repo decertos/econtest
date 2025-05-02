@@ -6,17 +6,23 @@
     <div>
         {{ form.csrf_token }}
     </div>
+    <table style="">
     {% for field in form if field.name != "csrf_token" %}
-        <div>
+        <tr>
             {% if field.label() != "Войти" %}
+                <td>
                 {{ field.label() }}
+                </td>
             {% endif %}
+            <td>
             {{ field() }}
+            </td>
             {% for error in field.errors %}
                 <div class="error" style="color: #c22134">{{ error }}</div>
             {% endfor %}
-        </div>
+        </tr>
     {% endfor %}
+    </table>
 </form>
 <p>Ещё не зарегистрированы? <a href="/register">Зарегистрируйтесь</a></p>
 {% endblock %}

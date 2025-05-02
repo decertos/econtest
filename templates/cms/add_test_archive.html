@@ -1,0 +1,23 @@
+{% extends "/cms/task_base.html" %}
+
+{% block content %}
+<h2>Добавление тестов архивом</h2>
+<p><strong>Формат архива:</strong><br>В архиве должны быть файлы вида:<br></p>
+<p>Замечание: testid считается от 1 в КАЖДОМ архиве, даже если тесты уже добавляли<br></p>
+<ul>
+    <li><i>testid.in</i> - файл со входными данными для теста с номером testid. Пример: 1.in</li>
+    <li><i>testid.out</i> - файл с выходными данными для теста с номером testid. Пример: 1.out</li>
+</ul>
+<form method="post" enctype="multipart/form-data">
+    <div>
+        {{ form.csrf_token }}
+    </div>
+    {% for field in form if field.name != "csrf_token" %}
+        <div>{{ field.label }}
+        {{ field() }}</div>
+        {% for error in field.errors %}
+            <div class="error">{{ error }}</div>
+        {% endfor %}
+    {% endfor %}
+</form>
+{% endblock %}

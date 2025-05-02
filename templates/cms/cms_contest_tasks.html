@@ -1,0 +1,17 @@
+{% extends "/cms/contest_base.html" %}
+
+{% block content %}
+<h1 style="text-align: center;">Задачи контеста</h1>
+<table style="margin: 0px auto; width: 100%;" class="table1">
+    <tr>
+        <th class="th1">ID</th>
+        <th class="th1">Название</th>
+    </tr>
+    {% for task in tasks %}
+        <tr class="tr1">
+            <td class="td1">{{ task.tid }}</td>
+            <td class="td1"><a href="/cms/task/{{ task.tid }}/index/">{{ task.title }}</a></td>
+        </tr>
+    {% endfor %}
+</table>
+{% endblock %}

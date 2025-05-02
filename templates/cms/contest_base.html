@@ -1,11 +1,10 @@
-<head lang="en">
+<head>
     <meta charset="UTF-8">
     <link rel="stylesheet" type="text/css" href="/static/styles.css">
-    <title>{{ title }} | {{ contest_title }}</title>
+    <title>{{ title }}</title>
 </head>
-
 <body>
-    <h1 class="title">{{ contest_title }}</h1>
+    <h1 class="title">EContest CMS</h1>
     <hr>
     <nav class="navbar">
       {% if not current_user.is_authenticated %}
@@ -13,12 +12,8 @@
       {% else %}
         <a href="/logout" class="username_a"><b>{{ current_user.login }}</b></a>
       {% endif %}
-      <a href="/register" class="navbar_a"><b>Регистрация</b></a>
-      <a href="/contests" class="navbar_a"><b>Контесты</b></a>
-      <a href="/api/" class="navbar_a"><b>API</b></a>
-        {% if current_user.is_admin %}
-            <a href="/cms/" class="navbar_a"><b>CMS</b></a>
-        {% endif %}
+      <a href="/cms/contest/{{ contest_id }}/index/" class="navbar_a"><b>Главная</b></a>
+      <a href="/cms/contest/{{ contest_id }}/tasks/" class="navbar_a"><b>Задачи</b></a>
     </nav>
     <hr>
     <main role="main" class="container">

@@ -1,21 +1,23 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div>
+<tr>
     <h1>Отослать решение</h1>
     <form action="" method="post" novalidate>
         <div>
             {{ form.csrf_token }}
         </div>
+        <table>
         {% for field in form if field.name != "csrf_token" %}
-            <div>
-                {{ field.label }}
-                {{ field() }}
-            </div>
+            <tr>
+                <td>{{ field.label }}</td>
+                <td>{{ field() }}</td>
+            </tr>
             {% for error in field.errors %}
                 <div class="error" style="color: #c22134">{{ error }}</div>
             {% endfor %}
         {% endfor %}
+        </table>
     </form>
     {% if errors %}
         <p style="color: #f74f4f">Задачи с таким ID не существует</p>

@@ -1,0 +1,8 @@
+{% extends "/cms/task_base.html" %}
+
+{% block content %}
+<h2>Добавить тест</h2>
+<a href="/cms/task/{{ task_id }}/tests/manual/">Ручное добавление</a><br>
+<a href="/cms/task/{{ task_id }}/tests/generator/">Генератор</a><br>
+<a href="/cms/task/{{ task_id }}/tests/archive/">Загрузить архивом тестов</a>
+{% endblock %}
