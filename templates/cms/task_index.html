@@ -1,0 +1,22 @@
+{% extends "/cms/task_base.html" %}
+
+{% block content %}
+<h1>Редактирование задачи</h1>
+<form method="post" novalidate>
+    <div>
+        {{ form.csrf_token }}
+    </div>
+    <table>
+    {% for field in form if field.name != "csrf_token" %}
+        <tr>
+            <td>{{ field.label }}</td>
+            <td>{{ field() }}</td>
+        </tr>
+        {% for error in field.errors %}
+            <div class="error">{{ error }}</div>
+        {% endfor %}
+    {% endfor %}
+    </table>
+</form>
+<p>Вернуться <a href="/cms/">на главную</a> страницу</p>
+{% endblock %}

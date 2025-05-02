@@ -1,0 +1,21 @@
+{% extends "/cms/contest_base.html" %}
+
+{% block content %}
+<form method="post" novalidate>
+    <div>
+        {{ form.csrf_token }}
+    </div>
+    <table>
+        {% for field in form if field.name != "csrf_token" %}
+            <tr>
+                <td>{{ field.label() }}</td>
+                <td>{{ field() }}</td>
+            </tr>
+            {% for error in field.errors %}
+                <div class="error">{{ error }}</div>
+            {% endfor %}
+        {% endfor %}
+    </table>
+</form>
+<p>Вернуться <a href="/cms/">на главную</a> страницу</p>
+{% endblock %}

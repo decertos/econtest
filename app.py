@@ -8,18 +8,20 @@ from data.tasks import Task
 from data.contests import Contest
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField
+from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField, FileField, SelectField, DateTimeField
 from wtforms.validators import EqualTo, DataRequired
 
 from flask_login import LoginManager, current_user, login_user, logout_user, login_required
 
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.exceptions import HTTPException
+from werkzeug.utils import secure_filename
 
 from collections import deque
 import subprocess
 import threading
 import datetime
+from zipfile import ZipFile
 from random import randint
 import time
 import json
@@ -40,180 +42,166 @@ class Checker:
         self.MAX_THREADS_COUNT = 2
         self.threads_count = 0
 
-    def check_ended(self, submission_id, verdict, test, execution_time):
+    def check_ended(self, submission_id, verdicts, max_execution_time, verdict):
         db_sess = db_session.create_session()
         submission = db_sess.query(Submission).filter(Submission.s_id == submission_id).first()
-        submission.verdict = f"{verdict} {test}"
-        submission.execution_time = round(execution_time * 1000, 0)
-        db_sess.commit()
-        db_sess.close()
-        os.remove(f"check{submission_id}.py")
-
-    def check(self, submission_id):
-        db_sess = db_session.create_session()
-        submission = db_sess.query(Submission).filter(Submission.s_id == submission_id).first()
-        with open(f"check{submission.s_id}.py", "w", encoding="UTF-8") as f:
-            f.write(submission.code)
-        test_cases = submission.task.get_test_cases()
-        verdicts = {i + 1: ("ig", 0) for i in range(len(test_cases))}
-        submission.points = 0
-        max_execution_time = 0
-        for i, t in enumerate(test_cases, start=1):
-            t0 = time.time()
-            submission.verdict = f"te {i}"
-            db_sess.commit()
-            in_data, out_data = t
-            try:
-                program_output = subprocess.check_output(["python", f"check{submission.s_id}.py"],
-                                                         input=in_data,
-                                                         text=True,
-                                                         timeout=submission.task.time_limit,
-                                                         stderr=subprocess.STDOUT).strip()
-                if out_data != program_output:
-                    verdicts[i] = ("wa", round((time.time() - t0) * 1000))
-                    submission.verdicts = json.dumps(verdicts)
-                    submission.verdict = f"wa {i}"
-                    db_sess.commit()
-                    self.check_ended(submission.s_id, "wa", i, max(max_execution_time, time.time() - t0))
-                    db_sess.close()
-                    self.threads_count -= 1
-                    if self.queue:
-                        self.threads_count += 1
-                        db_sess = db_session.create_session()
-                        submission1 = db_sess.query(Submission).filter(Submission.s_id == self.queue.popleft()).first()
-                        if submission1.task.mode == MODE_FULL_CHECK:
-                            thread = threading.Thread(target=self.check, args=(submission1.s_id,))
-                        elif submission1.task.mode == MODE_PARTIAL_CHECK:
-                            thread = threading.Thread(target=self.check_partial, args=(submission1.s_id,))
-                        db_sess.close()
-                        thread.start()
-                    return
-            except subprocess.TimeoutExpired:
-                verdicts[i] = ("tl", round((time.time() - t0) * 1000))
-                submission.verdicts = json.dumps(verdicts)
-                submission.verdict = f"tl {i}"
-                db_sess.commit()
-                self.check_ended(submission.s_id, "tl", i, max(max_execution_time, time.time() - t0))
-                db_sess.close()
-                self.threads_count -= 1
-                if self.queue:
-                    self.threads_count += 1
-                    db_sess = db_session.create_session()
-                    submission1 = db_sess.query(Submission).filter(Submission.s_id == self.queue.popleft()).first()
-                    if submission1.task.mode == MODE_FULL_CHECK:
-                        thread = threading.Thread(target=self.check, args=(submission1.s_id,))
-                    elif submission1.task.mode == MODE_PARTIAL_CHECK:
-                        thread = threading.Thread(target=self.check_partial, args=(submission1.s_id,))
-                    db_sess.close()
-                    thread.start()
-                return
-            except Exception as e:
-                verdicts[i] = ("re", round((time.time() - t0) * 1000))
-                submission.verdicts = json.dumps(verdicts)
-                submission.verdict = f"re {i}"
-                db_sess.commit()
-                self.check_ended(submission.s_id, "re", i, max(max_execution_time, time.time() - t0))
-                db_sess.close()
-                self.threads_count -= 1
-                if self.queue:
-                    self.threads_count += 1
-                    db_sess = db_session.create_session()
-                    submission1 = db_sess.query(Submission).filter(Submission.s_id == self.queue.popleft()).first()
-                    if submission1.task.mode == MODE_FULL_CHECK:
-                        thread = threading.Thread(target=self.check, args=(submission1.s_id,))
-                    elif submission1.task.mode == MODE_PARTIAL_CHECK:
-                        thread = threading.Thread(target=self.check_partial, args=(submission1.s_id,))
-                    db_sess.close()
-                    thread.start()
-                return
-            verdicts[i] = ("ok", round((time.time() - t0) * 1000))
-            max_execution_time = max(max_execution_time, time.time() - t0)
-        submission.points = 100
+        submission.verdict = verdict
         submission.verdicts = json.dumps(verdicts)
+        submission.execution_time = max_execution_time
         db_sess.commit()
-        self.check_ended(submission.s_id, "ok", "", max_execution_time)
+        if submission.language == "py":
+            run_file = f"check{submission_id}.py"
+            os.remove(run_file)
+        elif submission.language == "cpp":
+            run_file = f"check-cpp{submission_id}.exe"
+            os.remove(run_file)
+            run_file = f"check{submission_id}.cpp"
+            os.remove(run_file)
         db_sess.close()
+
         self.threads_count -= 1
-        if self.queue:
-            self.threads_count += 1
-            db_sess = db_session.create_session()
-            submission1 = db_sess.query(Submission).filter(Submission.s_id == self.queue.popleft()).first()
-            if submission1.task.mode == MODE_FULL_CHECK:
-                thread = threading.Thread(target=self.check, args=(submission1.s_id,))
-            elif submission1.task.mode == MODE_PARTIAL_CHECK:
-                thread = threading.Thread(target=self.check_partial, args=(submission1.s_id,))
-            db_sess.close()
-            thread.start()
 
-    def check_partial(self, submission_id):
+        if len(self.queue) > 0:
+            self.run_check(self.queue[0])
+
+    def check(self, code, language, submission_id):
+        self.queue.popleft()
+        # Получение тестов
         db_sess = db_session.create_session()
         submission = db_sess.query(Submission).filter(Submission.s_id == submission_id).first()
         test_cases = submission.task.get_test_cases()
-        verdicts = {i + 1: ("te", 0) for i in range(len(test_cases))}
+        time_limit = submission.task.time_limit
+        mode = submission.task.mode
+        db_sess.close()
+
+        db_sess = db_session.create_session()
+        submission = db_sess.query(Submission).filter(Submission.s_id == submission_id).first()
+        verdicts = {i + 1: ("ig", 0) for i in range(len(test_cases))}
+        submission.verdicts = json.dumps(verdicts)
+        submission.points = 0
+        db_sess.commit()
+        db_sess.close()
+
+        # Подготовка к запуску
+        with open(f"check{submission_id}.{language}", "w", encoding="UTF-8") as f:
+            f.write(code)
+
+        commands = []
+        if language == "py":
+            commands = ["python", f"check{submission_id}.{language}"]
+        elif language == "cpp":
+            db_sess = db_session.create_session()
+            submission = db_sess.query(Submission).filter(Submission.s_id == submission_id).first()
+            submission.verdict = "co 0"
+            verdicts["0"] = ("co", 0)
+            submission.verdicts = json.dumps(verdicts)
+            db_sess.commit()
+
+            compile_process = subprocess.run(["g++", f"check{submission_id}.{language}", "-o", f"check-cpp{submission_id}.exe", "-std=c++23"])
+            if compile_process.returncode != 0:
+                verdicts["1"] = ("ce", 0)
+                self.check_ended(submission_id, verdicts, 0, "ce")
+                return
+            verdicts["0"] = ("ok", 0)
+            submission.verdicts = json.dumps(verdicts)
+            db_sess.commit()
+            db_sess.close()
+            commands = [f"check-cpp{submission_id}.exe"]
+
+        print("RUNNING", file=sys.stderr)
         points = 0
-        add_points = 100 / len(test_cases)
-        passed = 0
-        with open(f"check{submission.s_id}.py", "w", encoding="UTF-8") as f:
-            f.write(submission.code)
+
+        # Проверка на тестах
         max_execution_time = 0
-        for i, t in enumerate(test_cases, start=1):
-            t0 = time.time()
+        for index, test in enumerate(test_cases, start=1):
+            i = str(index)
+            db_sess = db_session.create_session()
+            submission = db_sess.query(Submission).filter(Submission.s_id == submission_id).first()
             submission.verdict = f"te {i}"
             db_sess.commit()
-            in_data, out_data = t
+            db_sess.close()
+
+            t0 = time.time()
+            in_data, out_data = test
+
             try:
-                program_output = subprocess.check_output(["python", f"check{submission.s_id}.py"],
+                program_output = subprocess.check_output(commands,
                                                          input=in_data,
                                                          text=True,
-                                                         timeout=submission.task.time_limit,
+                                                         timeout=time_limit,
                                                          stderr=subprocess.STDOUT).strip()
-                if out_data != program_output:
-                    verdicts[i] = ("wa", round((time.time() - t0) * 1000))
+                max_execution_time = max(max_execution_time, self.get_time(t0))
+                print(program_output, out_data, file=sys.stderr)
+                if program_output.strip().rstrip() != out_data:
+                    verdicts[i] = ["wa", self.get_time(t0)]
+                    if mode == MODE_FULL_CHECK:
+                        self.check_ended(submission_id, verdicts, max_execution_time, f"wa {i}")
+                        return
+                    continue
             except subprocess.TimeoutExpired:
-                verdicts[i] = ("tl", round((time.time() - t0) * 1000))
+                max_execution_time = max(max_execution_time, self.get_time(t0))
+                verdicts[i] = ("tl", self.get_time(t0))
+                if mode == MODE_FULL_CHECK:
+                    self.check_ended(submission_id, verdicts, max_execution_time, f"tl {i}")
+                    return
+                continue
             except Exception as e:
-                verdicts[i] = ("re", round((time.time() - t0) * 1000))
-            max_execution_time = max(max_execution_time, time.time() - t0)
-            if verdicts[i] == ("te", 0):
-                passed += 1
-                verdicts[i] = ("ok", round((time.time() - t0) * 1000))
-                points += add_points
-        points = round(points, 2)
-        if passed == len(test_cases):
+                print(e, file=sys.stderr)
+                max_execution_time = max(max_execution_time, self.get_time(t0))
+                verdicts[i] = ("re", self.get_time(t0))
+                if mode == MODE_FULL_CHECK:
+                    self.check_ended(submission_id, verdicts, max_execution_time, f"re {i}")
+                    return
+                continue
+            max_execution_time = max(max_execution_time, self.get_time(t0))
+            verdicts[i] = ("ok", self.get_time(t0))
+            points += 100 / len(test_cases)
+
+        print(verdicts, file=sys.stderr)
+        if mode == MODE_PARTIAL_CHECK:
+            if all(verdicts[i][0] == "ok" for i in range(1, len(test_cases) + 1)):
+                points = 100
+        else:
             points = 100
-        submission.verdicts = json.dumps(verdicts)
+
+        db_sess = db_session.create_session()
+        submission = db_sess.query(Submission).filter(Submission.s_id == submission_id).first()
         submission.points = points
         db_sess.commit()
-        self.threads_count -= 1
-        if passed == len(test_cases):
-            self.check_ended(submission_id, "ok", "", max_execution_time)
-        else:
-            self.check_ended(submission_id, "ps", passed, max_execution_time)
         db_sess.close()
-        if self.queue:
-            self.threads_count += 1
-            db_sess = db_session.create_session()
-            submission1 = db_sess.query(Submission).filter(Submission.s_id == self.queue.popleft()).first()
-            if submission1.task.mode == MODE_FULL_CHECK:
-                thread = threading.Thread(target=self.check, args=(submission1.s_id,))
-            elif submission1.task.mode == MODE_PARTIAL_CHECK:
-                thread = threading.Thread(target=self.check_partial, args=(submission1.s_id,))
-            db_sess.close()
+
+        print(points, mode, file=sys.stderr)
+        if mode == MODE_PARTIAL_CHECK and points != 100:
+            passed = 0
+            for i in range(1, len(test_cases) + 1):
+                if verdicts[i][0] == "ok":
+                    passed += 1
+            self.check_ended(submission_id, verdicts, max_execution_time, f"ps {passed}")
+        else:
+            self.check_ended(submission_id, verdicts, max_execution_time, f"ok {len(test_cases) + 1}")
+
+    def get_time(self, t0):
+        return round((time.time() - t0) * 1000)
+
+    def run_check(self, submission_id):
+        db_sess = db_session.create_session()
+        submission = db_sess.query(Submission).filter(Submission.s_id == submission_id).first()
+        if self.threads_count < self.MAX_THREADS_COUNT:
+            code, language = submission.code, submission.language
+            thread = threading.Thread(target=self.check, args=(code, language, submission_id))
             thread.start()
+            self.threads_count += 1
+        db_sess.close()
 
     def add_submission(self, submission_id):
         db_sess = db_session.create_session()
         submission = db_sess.query(Submission).filter(Submission.s_id == submission_id).first()
-        self.queue.append(submission.s_id)
-        print("ADDED")
-        if self.threads_count < self.MAX_THREADS_COUNT:
-            self.threads_count += 1
-            if submission.task.mode == MODE_FULL_CHECK:
-                thread = threading.Thread(target=self.check, args=(self.queue.popleft(),))
-            elif submission.task.mode == MODE_PARTIAL_CHECK:
-                thread = threading.Thread(target=self.check_partial, args=(self.queue.popleft(), ))
+        if submission.language not in {"py", "cpp"}:
             db_sess.close()
-            thread.start()
+            return
+        db_sess.close()
+        self.queue.append(submission_id)
+        self.run_check(submission_id)
 
 
 app = Flask(__name__)
@@ -242,7 +230,7 @@ def load_user(user_id):
 class LoginForm(FlaskForm):
     username = StringField("Логин", validators=[DataRequired(message="Это обязательное поле.")])
     password = PasswordField("Пароль", validators=[DataRequired(message="Это обязательное поле.")])
-    remember_me = BooleanField("Запомнить меня")
+    remember_me = BooleanField("Не выходить")
     submit = SubmitField("Войти")
 
 
@@ -257,20 +245,8 @@ class RegisterForm(FlaskForm):
 
 class SubmissionForm(FlaskForm):
     task = StringField("Задача", validators=[DataRequired("Это обязательное поле.")])
+    language = SelectField("Язык", choices=[("py", "Python 3.10.2"), ("cpp", "GNU G++23 (64 bit, msys2)")])
     code = TextAreaField("Код", validators=[DataRequired("Это обязательное поле.")])
-    submit = SubmitField("Отправить")
-
-
-class CreateTaskForm(FlaskForm):
-    title = StringField("Название")
-    statement = TextAreaField("Условие")
-    in_data = TextAreaField("Формат входных данных")
-    out_data = TextAreaField("Формат выходных данных")
-    time_limit = StringField("Ограничение по времени исполнения")
-    memory_limit = StringField("Ограничение по памяти")
-    tests = TextAreaField("Тесты (через -)")
-    contest = StringField("ID Контеста")
-    mode = StringField("Режим (0 - все тесты, 1 - с частичным)")
     submit = SubmitField("Отправить")
 
 
@@ -282,8 +258,41 @@ class TaskEditForm(FlaskForm):
     time_limit = StringField("Ограничение по времени исполнения")
     memory_limit = StringField("Ограничение по памяти")
     contest = StringField("ID контеста")
-    mode = StringField("Режим (0 - все тесты, 1 - с частичным)")
+    mode = BooleanField("Частичное оценивание")
+    submit = SubmitField("Сохранить")
+
+
+class AddContestForm(FlaskForm):
+    submit = SubmitField("Добавить контест")
+
+
+class ContestEditForm(FlaskForm):
+    title = StringField("Название")
+    start_time = DateTimeField("Дата начала")
+    end_time = DateTimeField("Дата конца")
+    submit = SubmitField("Сохранить")
+
+
+class ManualTestForm(FlaskForm):
+    in_data = TextAreaField("Входные данные")
+    out_data = TextAreaField("Выходные данные")
     submit = SubmitField("Отправить")
+
+
+class ArchiveTestForm(FlaskForm):
+    archive = FileField()
+    submit = SubmitField()
+
+
+class EditTestForm(FlaskForm):
+    in_data = TextAreaField("Входные данные")
+    out_data = TextAreaField("Выходные данные")
+    delete = BooleanField("Удалить задачу", default=False)
+    submit = SubmitField("Отправить")
+
+
+class AddTaskForm(FlaskForm):
+    submit = SubmitField("Добавить задачу")
 
 
 @app.route("/")
@@ -417,27 +426,216 @@ def api_user_id(user_id):
 # Content Management System
 @app.route("/cms/")
 def cms_main_page():
-    return render_template("cms/cms_base.html", now_time=datetime.datetime.now())
+    if not current_user.is_admin:
+        return abort(403)
+    return render_template("/cms/cms_index.html", now_time=datetime.datetime.now())
 
 
-@app.route("/cms/tasks/")
+@app.route("/cms/tasks/", methods=["GET", "POST"])
 def cms_tasks():
+    if not current_user.is_admin:
+        return abort(403)
     db_sess = db_session.create_session()
     tasks = db_sess.query(Task).all()
-    template = render_template("cms/tasks.html", now_time=datetime.datetime.now())
+    form = AddTaskForm()
+    template = render_template("/cms/tasks.html", tasks=tasks, now_time=datetime.datetime.now(), form=form)
+    db_sess.close()
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        task = Task()
+        task.title = "Новая задача"
+        task.statement = "Введите условие задачи"
+        task.input_spec = "Введите формат входных данных"
+        task.output_spec = "Введите формат выходных данных"
+        task.contest_id = 1
+        task.test_cases = json.dumps([])
+        db_sess.add(task)
+        db_sess.commit()
+        db_sess.close()
+        return redirect("/cms/tasks/")
+    return template
+
+
+@app.route("/cms/task/<int:task_id>/index/", methods=["GET", "POST"])
+def task_index(task_id):
+    if not current_user.is_admin:
+        return abort(403)
+    db_sess = db_session.create_session()
+    task = db_sess.query(Task).filter(Task.tid == task_id).first()
+    form = TaskEditForm(title=task.title,
+                        in_data=task.input_spec,
+                        out_data=task.output_spec,
+                        contest=task.contest_id,
+                        time_limit=task.time_limit,
+                        memory_limit=task.memory_limit,
+                        statement=task.statement,
+                        mode=True if task.mode else False)
+    template = render_template("cms/task_index.html", form=form, task=task, task_id=task.tid, now_time=datetime.datetime.now())
+    db_sess.close()
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        task = db_sess.query(Task).filter(Task.tid == task_id).first()
+        task.title = form.title.data
+        task.input_spec = form.in_data.data
+        task.output_spec = form.out_data.data
+        task.contest_id = int(form.contest.data)
+        task.time_limit = int(form.time_limit.data)
+        task.memory_limit = int(form.memory_limit.data)
+        task.statement = form.statement.data
+        task.mode = form.mode.data
+        db_sess.commit()
+        db_sess.close()
+        return redirect(f"/cms/task/{task_id}/index/")
+    return template
+
+
+@app.route("/cms/task/<int:task_id>/tests/manual/", methods=["GET", "POST"])
+def cms_manual_test(task_id):
+    if not current_user.is_admin:
+        return abort(403)
+    form = ManualTestForm()
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        task = db_sess.query(Task).filter(Task.tid == task_id).first()
+        tests = task.get_test_cases()
+        tests.append((form.in_data.data.replace("\r", "").strip("\n").rstrip("\n"),
+                      form.out_data.data.replace("\r", "").strip("\n").rstrip("\n")))
+        task.test_cases = json.dumps(tests)
+        db_sess.commit()
+        db_sess.close()
+        return redirect(f"/cms/task/{task_id}/tests/")
+    return render_template("/cms/add_test_manual.html", task_id=task_id, form=form, now_time=datetime.datetime.now())
+
+
+@app.route("/cms/task/<int:task_id>/tests/")
+def cms_task_tests(task_id):
+    if not current_user.is_admin:
+        return abort(403)
+    db_sess = db_session.create_session()
+    task = db_sess.query(Task).filter(Task.tid == task_id).first()
+    if task.test_cases:
+        tests = task.get_test_cases()
+    db_sess.close()
+    return render_template("/cms/task_tests.html", task_id=task_id, tests=tests, length=len(tests), now_time=datetime.datetime.now())
+
+
+@app.route("/cms/task/<int:task_id>/tests/archive/", methods=["GET", "POST"])
+def cms_archive_test(task_id):
+    if not current_user.is_admin:
+        return abort(403)
+    form = ArchiveTestForm()
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        task = db_sess.query(Task).filter(Task.tid == task_id).first()
+        tests = task.get_test_cases()
+        file_data = request.files[form.archive.name]
+        with open(os.path.join(app.instance_path, file_data.filename), "wb") as f:
+            f.write(file_data.read())
+        with open(os.path.join(app.instance_path, file_data.filename), "rb") as f:
+            print(f.readlines())
+        with ZipFile(os.path.join(app.instance_path, file_data.filename)) as zip_file:
+            add_tests = [["", ""] for i in range(len(zip_file.namelist()) // 2)]
+            for file in zip_file.namelist():
+                if file.endswith(".in"):
+                    test_number = int(file[:file.find(".")])
+                    with zip_file.open(file, "r") as opened_file:
+                        add_tests[test_number - 1][0] = "\n".join([line.decode("UTF-8").rstrip() for line in opened_file.readlines()])
+                elif file.endswith(".out"):
+                    test_number = int(file[:file.find(".")])
+                    with zip_file.open(file, "r") as opened_file:
+                        add_tests[test_number - 1][1] = "\n".join([line.decode("UTF-8").rstrip() for line in opened_file.readlines()])
+                print(add_tests, file=sys.stderr)
+        os.remove(os.path.join(app.instance_path, file_data.filename))
+        tests += add_tests
+        task.test_cases = json.dumps(tests)
+        db_sess.commit()
+        db_sess.close()
+        return redirect(f"/cms/task/{task_id}/tests/")
+    return render_template("/cms/add_test_archive.html", task_id=task_id, now_time=datetime.datetime.now(), form=form)
+
+
+@app.route("/cms/task/<int:task_id>/tests/<int:test_id>/")
+def cms_test_data(task_id, test_id):
+    if not current_user.is_admin:
+        return abort(403)
+    db_sess = db_session.create_session()
+    task = db_sess.query(Task).filter(Task.tid == task_id).first()
+    tests = task.get_test_cases()
+    cur_test = tests[test_id - 1]
+    form = EditTestForm(in_data=cur_test[0],
+                        out_data=cur_test[1])
+    db_sess.close()
+    if form.validate_on_submit():
+        if form.delete.data:
+            tests.pop(cur_test - 1)
+            return redirect("/cms/task/<int:task_id>/tests/")
+
+
+@app.route("/cms/task/<int:task_id>/tests/add_test/")
+def cms_add_test(task_id):
+    if not current_user.is_admin:
+        return abort(403)
+    return render_template("/cms/add_test.html", task_id=task_id, now_time=datetime.datetime.now())
+
+
+@app.route("/cms/contests/", methods=["GET", "POST"])
+def cms_contests():
+    if not current_user.is_admin:
+        return abort(403)
+    form = AddContestForm()
+    db_sess = db_session.create_session()
+    contests = db_sess.query(Contest).all()
+    template = render_template("/cms/cms_contests.html", title="Контесты", form=form, contests=contests, now_time=datetime.datetime.now())
+    db_sess.close()
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        contest = Contest()
+        contest.title = "Новый контест"
+        contest.start_time = datetime.datetime.now()
+        contest.end_time = datetime.datetime.now()
+        db_sess.add(contest)
+        db_sess.commit()
+        db_sess.close()
+        return redirect("/cms/contests/")
+    return template
+
+
+@app.route("/cms/contest/<int:contest_id>/index/", methods=["GET", "POST"])
+def cms_contest_index(contest_id):
+    if not current_user.is_admin:
+        return abort(403)
+    db_sess = db_session.create_session()
+    contest = db_sess.query(Contest).filter(Contest.cid == contest_id).first()
+    form = ContestEditForm(title=contest.title,
+                           start_time=contest.start_time,
+                           end_time=contest.end_time)
+    template = render_template("/cms/contest_index.html", title="Главная", form=form, contest_id=contest_id, now_time=datetime.datetime.now())
+    db_sess.close()
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        contest = db_sess.query(Contest).filter(Contest.cid == contest_id).first()
+        contest.title = form.title.data
+        contest.start_time = form.start_time.data
+        contest.end_time = form.end_time.data
+        db_sess.commit()
+        db_sess.close()
+        return redirect(f"/cms/contest/{contest_id}/index/")
+    return template
+
+
+@app.route("/cms/contest/<int:contest_id>/tasks/")
+def cms_contest_tasks(contest_id):
+    if not current_user.is_admin:
+        return abort(403)
+    db_sess = db_session.create_session()
+    contest = db_sess.query(Contest).filter(Contest.cid == contest_id).first()
+    tasks = contest.tasks
+    template = render_template("/cms/cms_contest_tasks.html", title="Задачи", tasks=tasks, contest_id=contest_id, now_time=datetime.datetime.now())
     db_sess.close()
     return template
 
 
-@app.route("/cms/task/<int:task_id>/index/")
-def task_index():
-    pass
-
-
-
-
-
-@app.route("/contest/<int:contest>/index")
+@app.route("/contest/<int:contest>/index/")
 @limiter.limit("50 per minute")
 def index_page(contest):
     db_sess = db_session.create_session()
@@ -523,43 +721,9 @@ def get_task_data(task_id):
     if not task:
         db_sess.close()
         return abort(404)
-    template = render_template("task_index.html", task=task, title=task.title, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
+    template = render_template("task.html", task=task, title=task.title, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
     db_sess.close()
     return template
-
-
-@app.route("/add_task", methods=["GET", "POST"])
-@limiter.limit("50 per minute")
-def add_task():
-    if not current_user.is_authenticated or current_user.login != "admin":
-        return abort(403)
-    form = CreateTaskForm()
-    if form.validate_on_submit():
-        db_sess = db_session.create_session()
-        task = Task()
-        task.title = form.title.data
-        task.statement = form.statement.data
-        task.input_spec = form.in_data.data
-        task.output_spec = form.out_data.data
-        task.time_limit = int(form.time_limit.data)
-        task.memory_limit = int(form.memory_limit.data)
-        task.mode = int(form.mode.data)
-        task.contest_id = int(form.contest.data)
-        test_cases = []
-        j = 0
-        test_case = []
-        for i in form.tests.data.split("-"):
-            test_case.append(i.replace("\r", "").strip("\n").rstrip("\n"))
-            if j % 2 == 1:
-                test_cases.append(tuple(test_case))
-                test_case.clear()
-            j += 1
-        task.test_cases = json.dumps(test_cases)
-        db_sess.add(task)
-        db_sess.commit()
-        db_sess.close()
-        return "TASK ADDED"
-    return render_template("addtask.html", form=form, now_time=datetime.datetime.now())
 
 
 @app.route("/add_submission")
@@ -622,6 +786,7 @@ def submit(contest):
             return abort(406)
         submission = Submission()
         submission.code = form.code.data
+        submission.language = form.language.data
         submission.uid = cur_us.uid
         submission.user = cur_us
         submission.tid = task.tid
@@ -639,9 +804,9 @@ def submit(contest):
 @limiter.limit("100 per minute")
 @login_required
 def get_submissions(contest):
-    COLORS = {"ok": "#157002", "wa": "#6b0111", "tl": "#828003", "qu": "#000000", "te": "#116bfa", "ps": "#000000"}
-    BCOLORS = {"ok": "#b0eba4", "wa": "#f57d8f", "tl": "#f7f44a", "qu": "#ffffff", "te": "#94bdff", "ps": "#cfd0d1"}
-    VERDICTS = {"ok": "Полное решение", "qu": "В очереди", "te": "Выполняется", "wa": "Неправильный ответ", "tl": "Превышено ограничение по времени", "re": "Ошибка исполнения", "ml": "Превышено ограничение по памяти", "se": "Ошибка тестирующей системы", "ps": "Частичное решение"}
+    COLORS = {"ok": "#157002", "wa": "#6b0111", "tl": "#828003", "qu": "#000000", "te": "#116bfa", "ps": "#000000", "ce": "#0083b1", "co": "#116bfa"}
+    BCOLORS = {"ok": "#b0eba4", "wa": "#f57d8f", "tl": "#f7f44a", "qu": "#ffffff", "te": "#94bdff", "ps": "#cfd0d1", "ce": "#bdeeff", "co": "#94bdff"}
+    VERDICTS = {"ok": "Полное решение", "qu": "В очереди", "te": "Выполняется", "wa": "Неправильный ответ", "tl": "Превышено ограничение по времени", "re": "Ошибка исполнения", "ml": "Превышено ограничение по памяти", "se": "Ошибка тестирующей системы", "ps": "Частичное решение", "ce": "Ошибка компиляции", "co": "Компилируется"}
     db_sess = db_session.create_session()
     user = db_sess.query(User).filter(User.uid == current_user.uid).first()
     submissions = tuple(filter(lambda x: x.cid == contest, user.submissions))
@@ -707,6 +872,37 @@ def submission_view(submission_id):
 def standings(contest):
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(contest == Contest.cid).first()
+
+    start_time = contest.start_time
+    end_time = contest.end_time
+    now_time = datetime.datetime.now()
+    status = "не начат"
+    if start_time > now_time:
+        delta_time = start_time - now_time
+    elif start_time <= now_time <= end_time:
+        status = "идёт"
+        delta_time = now_time - start_time
+    else:
+        status = "завершён"
+        delta_time = end_time - start_time
+    seconds = delta_time.seconds
+    days = delta_time.days
+    all_time = days * 86400 + seconds
+    runs_string = ""
+    if days:
+        runs_string += f"{days}:"
+    runs_string += f"{seconds // 3600}:{str((seconds // 60) % 60).zfill(2)}:{str(seconds % 60).zfill(2)}"
+
+    delta_time = end_time - start_time
+    seconds = delta_time.seconds
+    days = delta_time.days
+    all_delta = ""
+    if days:
+        all_delta += f"{days}:"
+    all_delta += f"{seconds // 3600}:{str((seconds // 60) % 60).zfill(2)}:{str(seconds % 60).zfill(2)}"
+
+    percent = round(all_time / (days * 86400 + seconds) * 100)
+
     data = {}
     for submission in contest.submissions:
         user = submission.user.login
@@ -715,7 +911,7 @@ def standings(contest):
     items = list(data.items())
     new_items = [(username, sum(points.values())) for username, points in items]
     new_items.sort(key=lambda x: x[1], reverse=True)
-    template = render_template("standings.html", title="Положение", items=new_items, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
+    template = render_template("standings.html", title="Положение", items=new_items, status=status, runs_string=runs_string, all_delta=all_delta, percent=percent, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
     db_sess.close()
     return template
 
@@ -725,6 +921,37 @@ def standings(contest):
 def full_standings(contest):
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(contest == Contest.cid).first()
+
+    start_time = contest.start_time
+    end_time = contest.end_time
+    now_time = datetime.datetime.now()
+    status = "не начат"
+    if start_time > now_time:
+        delta_time = start_time - now_time
+    elif start_time <= now_time <= end_time:
+        status = "идёт"
+        delta_time = now_time - start_time
+    else:
+        status = "завершён"
+        delta_time = end_time - start_time
+    seconds = delta_time.seconds
+    days = delta_time.days
+    all_time = days * 86400 + seconds
+    runs_string = ""
+    if days:
+        runs_string += f"{days}:"
+    runs_string += f"{seconds // 3600}:{str((seconds // 60) % 60).zfill(2)}:{str(seconds % 60).zfill(2)}"
+
+    delta_time = end_time - start_time
+    seconds = delta_time.seconds
+    days = delta_time.days
+    all_delta = ""
+    if days:
+        all_delta += f"{days}:"
+    all_delta += f"{seconds // 3600}:{str((seconds // 60) % 60).zfill(2)}:{str(seconds % 60).zfill(2)}"
+
+    percent = round(all_time / (days * 86400 + seconds) * 100)
+
     data = {}
     for submission in contest.submissions:
         user = submission.user.login
@@ -733,7 +960,7 @@ def full_standings(contest):
     new_items = [(user, sum(points.values())) for user, points in data.items()]
     new_items.sort(key=lambda x: x[1], reverse=True)
     all_tasks = db_sess.query(Task).filter(Task.contest_id == contest.cid)
-    template = render_template("full_standings.html", title="Полное положение", items=data, new_items=new_items, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now(), all_tasks=all_tasks)
+    template = render_template("full_standings.html", title="Полное положение", status=status, runs_string=runs_string, all_delta=all_delta, percent=percent, items=data, new_items=new_items, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now(), all_tasks=all_tasks)
     db_sess.close()
     return template
 
@@ -741,9 +968,9 @@ def full_standings(contest):
 @app.route("/contest/<int:contest>/status")
 @limiter.limit("20 per minute")
 def status(contest):
-    COLORS = {"ok": "#157002", "wa": "#6b0111", "tl": "#828003", "qu": "#000000", "te": "#116bfa", "ps": "#000000"}
-    BCOLORS = {"ok": "#b0eba4", "wa": "#f57d8f", "tl": "#f7f44a", "qu": "#ffffff", "te": "#94bdff", "ps": "#cfd0d1"}
-    VERDICTS = {"ok": "Полное решение", "qu": "В очереди", "te": "Выполняется", "wa": "Неправильный ответ", "tl": "Превышено ограничение по времени", "re": "Ошибка исполнения", "ml": "Превышено ограничение по памяти", "se": "Ошибка тестирующей системы", "ps": "Частичное решение"}
+    COLORS = {"ok": "#157002", "wa": "#6b0111", "tl": "#828003", "qu": "#000000", "te": "#116bfa", "ps": "#000000", "co": "#116bfa"}
+    BCOLORS = {"ok": "#b0eba4", "wa": "#f57d8f", "tl": "#f7f44a", "qu": "#ffffff", "te": "#94bdff", "ps": "#cfd0d1", "co": "#94bdff"}
+    VERDICTS = {"ok": "Полное решение", "qu": "В очереди", "te": "Выполняется", "wa": "Неправильный ответ", "tl": "Превышено ограничение по времени", "re": "Ошибка исполнения", "ml": "Превышено ограничение по памяти", "se": "Ошибка тестирующей системы", "ps": "Частичное решение", "co": "Компилируется"}
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(contest == Contest.cid).first()
     submissions = db_sess.query(Submission).filter(Submission.cid == contest.cid).all()
@@ -755,7 +982,7 @@ def status(contest):
 @app.route("/verdicts_info")
 @limiter.limit("30 per minute")
 def verdicts_info():
-    return render_template("verdicts_info.html", now_time=datetime.datetime.now())
+    return render_template("verdicts_info.html", title="Пояснение вердиктов чекера", contest_title="EContest Help", now_time=datetime.datetime.now())
 
 
 if __name__ == "__main__":

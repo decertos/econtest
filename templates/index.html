@@ -1,22 +1,19 @@
 {% extends "base.html" %}
 
 {% block content %}
-<style>
-
-</style>
   <h2>{{ contest_title }}</h2>
-  <table class="table">
-    <tr class="table">
-      <td>{{ status }}</td>
-      <td>{{ runs_string }}</td>
+  <table class="table1">
+    <tr class="tr1">
+      <td class="td1">{{ status }}</td>
+      <td class="td1">{{ runs_string }}</td>
     </tr>
-    <tr>
-      <td>Начало</td>
-      <td>{{ start_time.strftime("%d.%m.%y %H:%M:%S") }}</td>
+    <tr class="tr1">
+      <td class="td1">Начало</td>
+      <td class="td1">{{ start_time.strftime("%d.%m.%y %H:%M:%S") }}</td>
     </tr>
-    <tr>
-      <td>Конец</td>
-      <td>{{ end_time.strftime("%d.%m.%y %H:%M:%S") }}</td>
+    <tr class="tr1">
+      <td class="td1">Конец</td>
+      <td class="td1">{{ end_time.strftime("%d.%m.%y %H:%M:%S") }}</td>
     </tr>
   </table>
   <p>Вернуться <a href="/">на главную</a> страницу</p>

@@ -7,41 +7,41 @@
 где <b>status</b> будет указывать на статус ("ok" - запрос выполнен успешно, "error" - запрос выполнен с ошибкой).
 Если status будет error, то в ключе error будет сообщение об ошибке. Иначе (при статусе "ok") в ключе "response" будет словарь с необходимыми значениями.</p>
 <p>Все запросы к API должны начинаться на /api/.../</p>
-<table>
+<table class="table1">
     <tr>
-        <th>Адрес</th>
-        <th>На выходе</th>
-        <th>Формат JSON</th>
+        <th class="th1">Адрес</th>
+        <th class="th1">На выходе</th>
+        <th class="th1">Формат JSON</th>
     </tr>
-    <tr>
-        <td>/api/user/</td>
-        <td>Все пользователи</td>
-        <td>{user_id: {"user_id", "login"}}</td>
+    <tr class="tr1">
+        <td class="td1">/api/user/</td>
+        <td class="td1">Все пользователи</td>
+        <td class="td1">{user_id: {"user_id", "login"}}</td>
     </tr>
-    <tr>
-        <td>/api/user/user_id(int)/</td>
-        <td>Данные пользователя по id</td>
-        <td>"user_id", "login"</td>
+    <tr class="tr1">
+        <td class="td1">/api/user/user_id(int)/</td>
+        <td class="td1">Данные пользователя по id</td>
+        <td class="td1">"user_id", "login"</td>
     </tr>
-    <tr>
-        <td>/api/task/</td>
-        <td>Все задачи</td>
-        <td>{task_id: {"tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode", "contest_id"}}</td>
+    <tr class="tr1">
+        <td class="td1">/api/task/</td>
+        <td class="td1">Все задачи</td>
+        <td class="td1">{task_id: {"tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode", "contest_id"}}</td>
     </tr>
-    <tr>
-        <td>/api/task/task_id(int)/</td>
-        <td>Данные задачи по id</td>
-        <td>"tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode", "contest_id"</td>
+    <tr class="tr1">
+        <td class="td1">/api/task/task_id(int)/</td>
+        <td class="td1">Данные задачи по id</td>
+        <td class="td1">"tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode", "contest_id"</td>
     </tr>
-    <tr>
-        <td>/api/contest/</td>
-        <td>Все контесты</td>
-        <td>{contest_id: "cid", "title", "start_time", "end_time"}</td>
+    <tr class="tr1">
+        <td class="td1">/api/contest/</td>
+        <td class="td1">Все контесты</td>
+        <td class="td1">{contest_id: "cid", "title", "start_time", "end_time"}</td>
     </tr>
-    <tr>
-        <td>/api/contest/contest_id(int)/</td>
-        <td>Данные определённого контеста</td>
-        <td>"cid", "title", "start_time", "end_time"</td>
+    <tr class="tr1">
+        <td class="td1">/api/contest/contest_id(int)/</td>
+        <td class="td1">Данные определённого контеста</td>
+        <td class="td1">"cid", "title", "start_time", "end_time"</td>
     </tr>
 </table>
 {% endblock %}

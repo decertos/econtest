@@ -1,11 +1,12 @@
-<head lang="en">
+<!DOCTYPE HTML>
+<html>
+  <head lang="en">
     <meta charset="UTF-8">
     <link rel="stylesheet" type="text/css" href="/static/styles.css">
-    <title>{{ title }} | {{ contest_title }}</title>
-</head>
-
-<body>
-    <h1 class="title">{{ contest_title }}</h1>
+    <title>EContest CMS</title>
+  </head>
+  <body>
+    <h1 class="title">EContest CMS</h1>
     <hr>
     <nav class="navbar">
       {% if not current_user.is_authenticated %}
@@ -13,18 +14,18 @@
       {% else %}
         <a href="/logout" class="username_a"><b>{{ current_user.login }}</b></a>
       {% endif %}
-      <a href="/register" class="navbar_a"><b>Регистрация</b></a>
-      <a href="/contests" class="navbar_a"><b>Контесты</b></a>
-      <a href="/api/" class="navbar_a"><b>API</b></a>
-        {% if current_user.is_admin %}
-            <a href="/cms/" class="navbar_a"><b>CMS</b></a>
-        {% endif %}
+      <a href="/cms" class="navbar_a"><b>Главная</b></a>
+      <a href="/cms/task/{{ task_id }}/index/" class="navbar_a"><b>Меню задачи</b></a>
+      <a href="/cms/task/{{ task_id }}/tests/" class="navbar_a"><b>Тесты</b></a>
+      <a href="/cms/task/{{ task_id }}/tests/add_test/" class="navbar_a"><b>Добавить тест</b></a>
     </nav>
     <hr>
+
     <main role="main" class="container">
       {% block content %}{% endblock %}
       <hr>
       <p>Время на сервере: {{ now_time.strftime("%d.%m.%Y %H:%M:%S") }} (UTC)</p>
       <p>econtest v3.0 (02.05.2025 21:09)</p>
     </main>
-</body>
+  </body>
+</html>

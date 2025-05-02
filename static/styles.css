@@ -9,9 +9,13 @@
     border-radius: 10px;
 }
 
-table, th, td {
+.table1, .th1, .td1 {
     border: 1px solid black;
     border-collapse: collapse;
+}
+
+.tr1:hover {
+    background-color: #dcdcdc;
 }
 
 .navbar_li {

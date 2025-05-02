@@ -12,6 +12,7 @@ class User(SqlAlchemyBase, UserMixin, SerializerMixin):
     uid = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
     login = sqlalchemy.Column(sqlalchemy.String, unique=True, index=True)
     password = sqlalchemy.Column(sqlalchemy.String)
+    is_admin = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
     submissions = orm.relationship("Submission", back_populates="user")
 
     def check_password(self, password):
