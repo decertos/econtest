@@ -1,7 +1,7 @@
 {% extends "/cms/task_base.html" %}
 
 {% block content %}
-<h1>Редактирование задачи</h1>
+<h2>Редактирование задачи</h2>
 <form method="post" novalidate>
     <div>
         {{ form.csrf_token }}
@@ -17,6 +17,15 @@
         {% endfor %}
     {% endfor %}
     </table>
+</form>
+<form method="post" novalidate>
+    <div>
+        {{ form.csrf_token }}
+    </div>
+    <h2>Удаление задачи</h2>
+    <p>Введите название задачи для подтверждения:<br></p>
+    {{ form1.title() }}
+    {{ form1.submit2() }}
 </form>
 <p>Вернуться <a href="/cms/">на главную</a> страницу</p>
 {% endblock %}
