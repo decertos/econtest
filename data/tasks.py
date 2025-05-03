@@ -18,6 +18,8 @@ class Task(SqlAlchemyBase, SerializerMixin):
     memory_limit = sqlalchemy.Column(sqlalchemy.Integer, default=256)
     mode = sqlalchemy.Column(sqlalchemy.Integer, default=0)
 
+    scoring = sqlalchemy.Column(sqlalchemy.String, default='{"scoring":[]}')
+
     submissions = orm.relationship("Submission", back_populates="task")
 
     contest_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey("contests.cid"))
@@ -25,3 +27,6 @@ class Task(SqlAlchemyBase, SerializerMixin):
 
     def get_test_cases(self):
         return json.loads(self.test_cases)
+
+    def get_scoring(self):
+        return json.loads(self.scoring)["scoring"]

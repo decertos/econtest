@@ -16,6 +16,7 @@
       {% endif %}
       <a href="/cms" class="navbar_a"><b>Главная</b></a>
       <a href="/cms/task/{{ task_id }}/index/" class="navbar_a"><b>Меню задачи</b></a>
+      <a href="/cms/task/{{ task_id }}/test_groups/" class="navbar_a"><b>Подгруппы</b></a>
       <a href="/cms/task/{{ task_id }}/tests/" class="navbar_a"><b>Тесты</b></a>
       <a href="/cms/task/{{ task_id }}/tests/add_test/" class="navbar_a"><b>Добавить тест</b></a>
     </nav>
@@ -25,7 +26,7 @@
       {% block content %}{% endblock %}
       <hr>
       <p>Время на сервере: {{ now_time.strftime("%d.%m.%Y %H:%M:%S") }} (UTC)</p>
-      <p>econtest v3.1 (03.05.2025 9:39 UTC+4)</p>
+      <p>econtest v3.2 (03.05.2025 11:51:00 UTC+4)</p>
     </main>
   </body>
 </html>
