@@ -12,7 +12,8 @@
       {% else %}
         <a href="/logout" class="username_a"><b>{{ current_user.login }}</b></a>
       {% endif %}
-      <a href="/cms/contest/{{ contest_id }}/index/" class="navbar_a"><b>Главная</b></a>
+      <a href="/cms/" class="navbar_a"><b>Главная</b></a>
+      <a href="/cms/contest/{{ contest_id }}/index/" class="navbar_a"><b>Меню контеста</b></a>
       <a href="/cms/contest/{{ contest_id }}/tasks/" class="navbar_a"><b>Задачи</b></a>
     </nav>
     <hr>
@@ -20,6 +21,6 @@
       {% block content %}{% endblock %}
       <hr>
       <p>Время на сервере: {{ now_time.strftime("%d.%m.%Y %H:%M:%S") }} (UTC)</p>
-      <p>econtest v3.0 (02.05.2025 21:09)</p>
+      <p>econtest v3.1 (03.05.2025 9:39 UTC+4)</p>
     </main>
 </body>

@@ -2,7 +2,10 @@
 
 {% block content %}
 <h2>Добавить тест</h2>
-<a href="/cms/task/{{ task_id }}/tests/manual/">Ручное добавление</a><br>
-<a href="/cms/task/{{ task_id }}/tests/generator/">Генератор</a><br>
-<a href="/cms/task/{{ task_id }}/tests/archive/">Загрузить архивом тестов</a>
+<table class="table1">
+<tr class="tr1"><td class="td1"><a href="/cms/task/{{ task_id }}/tests/manual/">Ручное добавление</a></td>
+<td class="td1">Ввести тест вручную</td></tr>
+<tr class="tr1"><td class="td1"><a href="/cms/task/{{ task_id }}/tests/archive/">Загрузить архивом тестов</a></td>
+<td class="td1">Загрузить архив с тестами</td></tr>
+</table>
 {% endblock %}
