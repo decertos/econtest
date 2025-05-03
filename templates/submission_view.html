@@ -14,7 +14,11 @@
 <p><i>Код посылки: </i><textarea readonly>{{ "\n".join(submission.code.split("\n")) }}</textarea></p>
 <p>Детальная информация о тестах</p>
 <code>
-{% for i, test in verdicts %}Test {{ i }}: {{ test[0] }} with time {{ test[1] }} ms<br>
-{% endfor %}
+    {% for i in range(len_groups) %}
+Tests Group {{ i + 1 }} points {{ group_points_all[i] }}:<br>
+    {% for test in all_groups[i]["required_tests"] %}
+&nbsp;&nbsp;&nbsp;&nbsp;Test {{ test }}: {{ verdicts[test - 1][0] }} with time {{ verdicts[test - 1][1] }} ms points {{ points[test - 1] }}<br>
+    {% endfor %}
+    {% endfor %}
 </code>
 {% endblock %}
