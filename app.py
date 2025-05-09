@@ -6,9 +6,11 @@ from data.users import User
 from data.submissions import Submission
 from data.tasks import Task
 from data.contests import Contest
+from data.news import News
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField, FileField, SelectField, DateTimeField
+from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField, FileField, SelectField, \
+    DateTimeField
 from wtforms.validators import EqualTo, DataRequired
 
 from flask_login import LoginManager, current_user, login_user, logout_user, login_required
@@ -33,10 +35,8 @@ from flask_limiter.util import get_remote_address
 
 import logging
 
-
 logging.basicConfig()
-logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
-
+logging.getLogger("sqlalchemy").setLevel(logging.FATAL)
 
 MODE_FULL_CHECK = 0
 MODE_PARTIAL_CHECK = 1
@@ -59,8 +59,9 @@ class Checker:
             run_file = f"check{submission_id}.py"
             os.remove(run_file)
         elif submission.language == "cpp":
-            run_file = f"check-cpp{submission_id}.exe"
-            os.remove(run_file)
+            if not verdict[:2] == "ce":
+                run_file = f"check-cpp{submission_id}.exe"
+                os.remove(run_file)
             run_file = f"check{submission_id}.cpp"
             os.remove(run_file)
         db_sess.close()
@@ -100,6 +101,11 @@ class Checker:
                 tests_points[int(j) - 1] = test_points
         points = 0
 
+        check_code = " ".join(code.split(" "))
+        if "import os" in check_code or "import subprocess" in check_code or "system" in check_code or "db_session" in check_code:
+            verdicts["1"] = (
+                "ce", 0, "restricted words. do not use import os, subprocess or anything to hack the testing system")
+            self.check_ended(submission_id, verdicts, 0, "ce")
         # Подготовка к запуску
         code_language = language
         if language.startswith("py"):
@@ -122,9 +128,11 @@ class Checker:
             submission.verdicts = json.dumps(verdicts)
             db_sess.commit()
 
-            compile_process = subprocess.run(["g++", f"check{submission_id}.{language}", "-o", f"check-cpp{submission_id}.exe", "-std=c++23"])
+            compile_process = subprocess.run(
+                ["g++", f"check{submission_id}.{language}", "-o", f"check-cpp{submission_id}.exe", "-std=c++23"],
+                stderr=subprocess.PIPE)
             if compile_process.returncode != 0:
-                verdicts["0"] = ("ce", 0)
+                verdicts["1"] = ("ce", 0, str(compile_process.stderr))
                 self.check_ended(submission_id, verdicts, 0, "ce")
                 return
             verdicts["0"] = ("ok", 0)
@@ -167,7 +175,10 @@ class Checker:
                 continue
             except Exception as e:
                 max_execution_time = max(max_execution_time, self.get_time(t0))
-                verdicts[i] = ("re", self.get_time(t0))
+                if index == 1:
+                    verdicts[i] = ("re", self.get_time(t0), e.output)
+                else:
+                    verdicts[i] = ("re", self.get_time(t0))
                 if mode == MODE_FULL_CHECK:
                     self.check_ended(submission_id, verdicts, max_execution_time, f"re {i}")
                     return
@@ -175,14 +186,13 @@ class Checker:
             max_execution_time = max(max_execution_time, self.get_time(t0))
             verdicts[int(i)] = ("ok", self.get_time(t0))
             points += tests_points[int(i) - 1]
-
-        if mode == MODE_PARTIAL_CHECK:
-            if all(verdicts[i][0] == "ok" for i in range(1, len(test_cases) + 1)):
-                points = 100
-        else:
-            points = 100
         db_sess = db_session.create_session()
         submission = db_sess.query(Submission).filter(Submission.s_id == submission_id).first()
+        if mode == MODE_PARTIAL_CHECK:
+            if all(verdicts[i][0] == "ok" for i in range(1, len(test_cases) + 1)):
+                submission.points = submission.task.points
+        else:
+            points = submission.task.points
         submission.points = round(points, 2)
         db_sess.commit()
         db_sess.close()
@@ -261,7 +271,8 @@ class RegisterForm(FlaskForm):
 
 class SubmissionForm(FlaskForm):
     task = StringField("Задача", validators=[DataRequired("Это обязательное поле.")])
-    language = SelectField("Язык", choices=[("py3102", "Python 3.10.2"), ("py3123", "Python 3.12.3"), ("cpp", "GNU G++23 (64 bit, msys2)")])
+    language = SelectField("Язык", choices=[("py3102", "Python 3.10.2"), ("py3123", "Python 3.12.3"),
+                                            ("cpp", "GNU G++23 (64 bit, msys2)")])
     code = TextAreaField("Код", validators=[DataRequired("Это обязательное поле.")])
     submit = SubmitField("Отправить")
 
@@ -300,6 +311,22 @@ class ContestEditForm(FlaskForm):
 
 class ContestDeleteForm(FlaskForm):
     title = StringField("Название контеста")
+    submit2 = SubmitField("Удалить")
+
+
+class NewsEditForm(FlaskForm):
+    title = StringField("Заголовок")
+    author = StringField("Автор")
+    content = StringField("Содержание")
+    cid = StringField("ID контеста")
+    submit1 = SubmitField("Сохранить")
+
+
+class NewsCreateForm(FlaskForm):
+    submit = SubmitField("Добавить новость")
+
+
+class NewsDeleteForm(FlaskForm):
     submit2 = SubmitField("Удалить")
 
 
@@ -345,10 +372,17 @@ def main_page():
     return redirect("/contests")
 
 
-CODES = {"404 Not Found": ("404 Не найдено", "Запрашиваемый URL-адрес не был найден на сервере.", "Запрашиваемый URL-адрес не был найден на сервере. Если Вы ввели URL-адрес вручную, проверьте свое правописание и попробуйте еще раз."),
-         "401 Unauthorized": ("401 Не авторизован", "Сервер не смог убедиться, что Вам разрешено получить доступ к запрашиваемому URL-адресу", "Сервер не смог убедиться, что Вам разрешено получить доступ к запрошенному URL-адресу. Вы либо предоставили неправильные учетные данные (например, неправильный пароль), либо Ваш браузер не понимает, как предоставить необходимые учетные данные."),
-         "403 Forbidden": ("403 Доступ запрещён", "У вас нет разрешения на доступ к запрошенному ресурсу", "У вас нет разрешения на доступ к запрошенному ресурсу. Он либо защищен от чтения, либо не читается сервером."),
-         "500 Internal Server Error": ("500 Внутренняя ошибка сервера", "На сервере произошла внутренняя ошибка и не удалось выполнить ваш запрос.", "На сервере произошла внутренняя ошибка, и он не смог выполнить ваш запрос. Либо сервер перегружен, либо в приложении ошибка.")}
+CODES = {"404 Not Found": ("404 Не найдено", "Запрашиваемый URL-адрес не был найден на сервере.",
+                           "Запрашиваемый URL-адрес не был найден на сервере. Если Вы ввели URL-адрес вручную, проверьте свое правописание и попробуйте еще раз."),
+         "401 Unauthorized": ("401 Не авторизован",
+                              "Сервер не смог убедиться, что Вам разрешено получить доступ к запрашиваемому URL-адресу",
+                              "Сервер не смог убедиться, что Вам разрешено получить доступ к запрошенному URL-адресу. Вы либо предоставили неправильные учетные данные (например, неправильный пароль), либо Ваш браузер не понимает, как предоставить необходимые учетные данные."),
+         "403 Forbidden": ("403 Доступ запрещён", "У вас нет разрешения на доступ к запрошенному ресурсу",
+                           "У вас нет разрешения на доступ к запрошенному ресурсу. Он либо защищен от чтения, либо не читается сервером."),
+         "500 Internal Server Error": (
+             "500 Внутренняя ошибка сервера",
+             "На сервере произошла внутренняя ошибка и не удалось выполнить ваш запрос.",
+             "На сервере произошла внутренняя ошибка, и он не смог выполнить ваш запрос. Либо сервер перегружен, либо в приложении ошибка.")}
 
 
 @app.errorhandler(HTTPException)
@@ -362,16 +396,19 @@ def error_handler(code):
     if "/api/" in request.full_path:
         return jsonify({"status": "error", "error": code})
     if "ru" in request.accept_languages:
-        title, text, text1 = CODES.get(code[:code.find(":")], (code[:code.find(":")], code[code.find(":") + 2:code.find(".")], code[code.find(":") + 2:]))
+        title, text, text1 = CODES.get(code[:code.find(":")], (
+            code[:code.find(":")], code[code.find(":") + 2:code.find(".")], code[code.find(":") + 2:]))
     else:
         title, text, text1 = code[:code.find(":")], code[code.find(":") + 2:code.find(".")], code[code.find(":") + 2:]
-    return render_template("error_handler.html", title=title, text=text, text1=text1, request=request, http_code=code[:code.find(":")], now_time=datetime.datetime.now())
+    return render_template("error_handler.html", title=title, text=text, text1=text1, request=request,
+                           http_code=code[:code.find(":")], now_time=datetime.datetime.now())
 
 
 # API
 @app.route("/api/")
 def api():
-    return render_template("api.html", title="Главная страница", contest_title="EContest API", now_time=datetime.datetime.now())
+    return render_template("api.html", title="Главная страница", contest_title="EContest API",
+                           now_time=datetime.datetime.now())
 
 
 @blueprint.route("/api/contest/", methods=["GET", "POST"])
@@ -409,7 +446,9 @@ def api_tasks():
     tasks = db_sess.query(Task).all()
     data = {"status": "ok", "response": {}}
     for task in tasks:
-        data["response"][str(task.tid)] = task.to_dict(only=("tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode", "contest_id"))
+        data["response"][str(task.tid)] = task.to_dict(only=(
+            "tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode",
+            "contest_id"))
     db_sess.close()
     return jsonify(data)
 
@@ -422,21 +461,23 @@ def api_tasks_id(task_id):
     task = db_sess.query(Task).filter(Task.tid == task_id).first()
     if not task:
         return jsonify({"status": "error", "error": "not found"})
-    data = {"status": "ok", "response": task.to_dict(only=("tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode", "contest_id"))}
+    data = {"status": "ok", "response": task.to_dict(only=(
+        "tid", "title", "statement", "input_spec", "output_spec", "time_limit", "memory_limit", "mode", "contest_id"))}
     db_sess.close()
     return data
 
 
 @blueprint.route("/api/admin/task_test_cases/<int:task_id>/")
 def api_admin_task_test_cases(task_id):
-    return jsonify({"status": "error", "error": "you are not allowed to enter this resource"})
+    if not current_user.is_authenticated or not current_user.is_admin:
+        return jsonify({"status": "error", "error": "you are not allowed to enter this resource"})
     if request.method == "POST":
         return jsonify({"status": "error", "error": "method not realized"})
     db_sess = db_session.create_session()
     task = db_sess.query(Task).filter(Task.tid == task_id).first()
     if not task:
         return jsonify({"status": "error", "error": "not found"})
-    data = {"status": "ok", "response": task.to_dict(only=("test_cases", ))}
+    data = {"status": "ok", "response": task.to_dict(only=("test_cases",))}
     db_sess.close()
     return data
 
@@ -515,7 +556,8 @@ def task_index(task_id):
                         statement=task.statement,
                         mode=True if task.mode else False)
     form1 = TaskDeleteForm()
-    template = render_template("cms/task_index.html", form=form, form1=form1, task=task, task_id=task.tid, now_time=datetime.datetime.now())
+    template = render_template("cms/task_index.html", form=form, form1=form1, task=task, task_id=task.tid,
+                               now_time=datetime.datetime.now())
     db_sess.close()
     if form.submit1.data and form.validate():
         db_sess = db_session.create_session()
@@ -563,6 +605,8 @@ def cms_manual_test(task_id):
 
 @app.route("/cms/task/<int:task_id>/test_groups/", methods=["GET", "POST"])
 def cms_task_test_groups(task_id):
+    if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
+        return abort(403)
     db_sess = db_session.create_session()
     task = db_sess.query(Task).filter(Task.tid == task_id).first()
     # {"scoring": [{"required_tests": []", "points": int}]}
@@ -599,15 +643,69 @@ def cms_task_test_groups(task_id):
     return template
 
 
+@app.route("/cms/news/<int:news_id>/index/", methods=["GET", "POST"])
+def cms_news_index(news_id):
+    if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
+        return abort(403)
+    db_sess = db_session.create_session()
+    news = db_sess.query(News).filter(News.nid == news_id).first()
+    form1 = NewsEditForm(title=news.title,
+                         author=news.author,
+                         content=news.content,
+                         cid=news.cid)
+    form2 = NewsDeleteForm()
+    template = render_template("/cms/news_index.html", news_id=news_id, form1=form1, form2=form2, now_time=datetime.datetime.now())
+    db_sess.close()
+    if form1.submit1.data and form1.validate():
+        db_sess = db_session.create_session()
+        news = db_sess.query(News).filter(News.nid == news_id).first()
+        news.title = form1.title.data
+        news.author = form1.author.data
+        news.content = form1.content.data
+        news.cid = int(form1.cid.data)
+        db_sess.commit()
+        db_sess.close()
+        return redirect(f"/cms/news/{news_id}/index/")
+    if form2.submit2.data and form2.validate():
+        db_sess = db_session.create_session()
+        db_sess.query(News).filter(News.nid == news_id).delete()
+        db_sess.commit()
+        db_sess.close()
+        return redirect("/cms/news/")
+    return template
+
+
+@app.route("/cms/news/")
+def cms_news():
+    if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
+        return abort(403)
+    db_sess = db_session.create_session()
+    all_news = db_sess.query(News).all()
+    template = render_template("/cms/cms_news.html", all_news=all_news, now_time=datetime.datetime.now())
+    db_sess.close()
+    return template
+
+
+def set_admin(username):
+    db_sess = db_session.create_session()
+    user = db_sess.query(User).filter(username == User.login).first()
+    user.is_admin = True
+    db_sess.commit()
+    db_sess.close()
+
+
 @app.route("/cms/task/<int:task_id>/test_groups/<int:test_group_id>/", methods=["GET", "POST"])
 def cms_task_test_group_edit(task_id, test_group_id):
+    if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
+        return abort(403)
     db_sess = db_session.create_session()
     task = db_sess.query(Task).filter(Task.tid == task_id).first()
     group_data = task.get_scoring()[test_group_id - 1]
     form = GroupEditForm(points=group_data["points"],
                          tests="\n".join(group_data["required_tests"]))
     form1 = GroupDeleteForm()
-    template = render_template("/cms/test_group_view.html", form=form, form1=form1, task_id=task_id, now_time=datetime.datetime.now())
+    template = render_template("/cms/test_group_view.html", form=form, form1=form1, task_id=task_id,
+                               now_time=datetime.datetime.now())
 
     db_sess.close()
     if form.submit1.data and form.validate():
@@ -618,6 +716,7 @@ def cms_task_test_group_edit(task_id, test_group_id):
         scoring = task.get_scoring()
         scoring[test_group_id - 1] = group_data
         task.scoring = json.dumps({"scoring": scoring})
+        task.points += int(form.points.data)
         db_sess.commit()
         db_sess.close()
         return redirect(f"/cms/task/{task_id}/test_groups/{test_group_id}/")
@@ -625,12 +724,14 @@ def cms_task_test_group_edit(task_id, test_group_id):
         db_sess = db_session.create_session()
         task = db_sess.query(Task).filter(Task.tid == task_id).first()
         scoring = task.get_scoring()
+        task.points -= int(scoring[test_group_id - 1]["points"])
         scoring.pop(test_group_id - 1)
         task.scoring = json.dumps({"scoring": scoring})
         db_sess.commit()
         db_sess.close()
         return redirect(f"/cms/task/{task_id}/test_groups/")
     return template
+
 
 @app.route("/cms/task/<int:task_id>/tests/")
 def cms_task_tests(task_id):
@@ -641,7 +742,8 @@ def cms_task_tests(task_id):
     if task.test_cases:
         tests = task.get_test_cases()
     db_sess.close()
-    return render_template("/cms/task_tests.html", task_id=task_id, tests=tests, length=len(tests), now_time=datetime.datetime.now())
+    return render_template("/cms/task_tests.html", task_id=task_id, tests=tests, length=len(tests),
+                           now_time=datetime.datetime.now())
 
 
 @app.route("/cms/task/<int:task_id>/tests/<int:test_id>/", methods=["GET", "POST"])
@@ -653,7 +755,8 @@ def cms_task_tests_view(task_id, test_id):
     tests = task.get_test_cases()
     test = tests[test_id - 1]
     form = TestDeleteForm()
-    template = render_template("/cms/test_page.html", form=form, in_data=test[0][:256], out_data=test[1][:256], now_time=datetime.datetime.now())
+    template = render_template("/cms/test_page.html", form=form, in_data=test[0][:256], out_data=test[1][:256],
+                               now_time=datetime.datetime.now())
     db_sess.close()
     if form.validate_on_submit():
         db_sess = db_session.create_session()
@@ -685,11 +788,13 @@ def cms_archive_test(task_id):
                 if file.endswith(".in"):
                     test_number = int(file[:file.find(".")])
                     with zip_file.open(file, "r") as opened_file:
-                        add_tests[test_number - 1][0] = "\n".join([line.decode("UTF-8").rstrip() for line in opened_file.readlines()])
+                        add_tests[test_number - 1][0] = "\n".join(
+                            [line.decode("UTF-8").rstrip() for line in opened_file.readlines()])
                 elif file.endswith(".out"):
                     test_number = int(file[:file.find(".")])
                     with zip_file.open(file, "r") as opened_file:
-                        add_tests[test_number - 1][1] = "\n".join([line.decode("UTF-8").rstrip() for line in opened_file.readlines()])
+                        add_tests[test_number - 1][1] = "\n".join(
+                            [line.decode("UTF-8").rstrip() for line in opened_file.readlines()])
         os.remove(os.path.join(app.instance_path, file_data.filename))
         tests += add_tests
         task.test_cases = json.dumps(tests)
@@ -730,7 +835,8 @@ def cms_contests():
     form = AddContestForm()
     db_sess = db_session.create_session()
     contests = db_sess.query(Contest).all()
-    template = render_template("/cms/cms_contests.html", title="Контесты", form=form, contests=contests, now_time=datetime.datetime.now())
+    template = render_template("/cms/cms_contests.html", title="Контесты", form=form, contests=contests,
+                               now_time=datetime.datetime.now())
     db_sess.close()
     if form.validate_on_submit():
         db_sess = db_session.create_session()
@@ -755,7 +861,8 @@ def cms_contest_index(contest_id):
                            start_time=contest.start_time,
                            end_time=contest.end_time)
     form1 = ContestDeleteForm()
-    template = render_template("/cms/contest_index.html", title="Главная", form=form, form1=form1, contest_id=contest_id, now_time=datetime.datetime.now())
+    template = render_template("/cms/contest_index.html", title="Главная", form=form, form1=form1,
+                               contest_id=contest_id, now_time=datetime.datetime.now())
     db_sess.close()
     if form.submit1.data and form.validate():
         db_sess = db_session.create_session()
@@ -786,8 +893,33 @@ def cms_contest_tasks(contest_id):
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(Contest.cid == contest_id).first()
     tasks = contest.tasks
-    template = render_template("/cms/cms_contest_tasks.html", title="Задачи", tasks=tasks, contest_id=contest_id, now_time=datetime.datetime.now())
+    template = render_template("/cms/cms_contest_tasks.html", title="Задачи", tasks=tasks, contest_id=contest_id,
+                               now_time=datetime.datetime.now())
     db_sess.close()
+    return template
+
+
+@app.route("/cms/contest/<int:contest_id>/news/", methods=["GET", "POST"])
+def cms_contest_news(contest_id):
+    if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
+        return abort(403)
+    db_sess = db_session.create_session()
+    contest = db_sess.query(Contest).filter(Contest.cid == contest_id).first()
+    form = NewsCreateForm()
+    all_news = contest.news
+    template = render_template("/cms/contest_news.html", form=form, title="Новости", all_news=all_news, contest_id=contest_id,
+                               now_time=datetime.datetime.now())
+    db_sess.close()
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        news = News()
+        news.title = "Заголовок новости"
+        news.author = "Автор новости"
+        news.content = "Содержание новости"
+        news.cid = contest_id
+        db_sess.add(news)
+        db_sess.commit()
+        db_sess.close()
     return template
 
 
@@ -818,7 +950,12 @@ def index_page(contest):
     if days:
         runs_string += f"{days}:"
     runs_string += f"{seconds // 3600}:{str((seconds // 60) % 60).zfill(2)}:{str(seconds % 60).zfill(2)}"
-    template = render_template("index.html", title="EContest", start_time=start_time, end_time=end_time, status=status, runs_string=runs_string, contest=contest, contest_title=contest_title, now_time=datetime.datetime.now())
+
+    all_news = db_sess.query(News).all()
+    template = render_template("index.html", title="EContest", start_time=start_time, end_time=end_time, status=status, all_news=all_news,
+                               runs_string=runs_string, contest=contest, contest_title=contest_title,
+                               now_time=datetime.datetime.now())
+    db_sess.close()
     return template
 
 
@@ -833,7 +970,8 @@ def login_form():
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
             return redirect("/contests")
-    return render_template("login.html", title="Вход", form=form, contest_title="EContest", now_time=datetime.datetime.now())
+    return render_template("login.html", title="Вход", form=form, contest_title="EContest",
+                           now_time=datetime.datetime.now())
 
 
 @app.route("/logout")
@@ -860,7 +998,8 @@ def register_form():
         db_sess.commit()
         db_sess.close()
         return redirect("/contests")
-    return render_template("register.html", title="Регистрация", form=form, contest_title="EContest", now_time=datetime.datetime.now())
+    return render_template("register.html", title="Регистрация", form=form, contest_title="EContest",
+                           now_time=datetime.datetime.now())
 
 
 @app.route("/task/<int:task_id>")
@@ -876,7 +1015,8 @@ def get_task_data(task_id):
     if not task:
         db_sess.close()
         return abort(404)
-    template = render_template("task.html", task=task, title=task.title, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
+    template = render_template("task.html", task=task, title=task.title, contest=contest.cid,
+                               contest_title=contest.title, now_time=datetime.datetime.now())
     db_sess.close()
     return template
 
@@ -893,14 +1033,16 @@ def submit(contest):
     contest_title = contest_object.title
     if datetime.datetime.now() < contest_object.start_time or contest_object.end_time < datetime.datetime.now():
         db_sess.close()
-        return render_template("contest_access_denied.html", title="Доступ запрещён", contest=contest, contest_title=contest_object.title, now_time=datetime.datetime.now())
+        return render_template("contest_access_denied.html", title="Доступ запрещён", contest=contest,
+                               contest_title=contest_object.title, now_time=datetime.datetime.now())
     db_sess.close()
     if form.validate_on_submit():
         db_sess = db_session.create_session()
         task = db_sess.query(Task).filter(Task.tid == form.task.data).first()
         if not task:
             db_sess.close()
-            return render_template("submit.html", title="Отослать", form=form, errors=True, contest=contest, contest_title=contest_title, now_time=datetime.datetime.now())
+            return render_template("submit.html", title="Отослать", form=form, errors=True, contest=contest,
+                                   contest_title=contest_title, now_time=datetime.datetime.now())
         cur_us = db_sess.merge(current_user)
         if contest != task.contest_id:
             return abort(406)
@@ -917,21 +1059,30 @@ def submit(contest):
         checker.add_submission(submission.s_id)
         db_sess.close()
         return redirect(f"/contest/{contest}/submissions")
-    return render_template("submit.html", title="Отослать", form=form, errors=False, contest=contest, contest_title=contest_title, now_time=datetime.datetime.now())
+    return render_template("submit.html", title="Отослать", form=form, errors=False, contest=contest,
+                           contest_title=contest_title, now_time=datetime.datetime.now())
 
 
 @app.route("/contest/<int:contest>/submissions")
 @limiter.limit("100 per minute")
 @login_required
 def get_submissions(contest):
-    COLORS = {"ok": "#157002", "wa": "#6b0111", "tl": "#828003", "qu": "#000000", "te": "#116bfa", "ps": "#000000", "ce": "#0083b1", "co": "#116bfa"}
-    BCOLORS = {"ok": "#b0eba4", "wa": "#f57d8f", "tl": "#f7f44a", "qu": "#ffffff", "te": "#94bdff", "ps": "#cfd0d1", "ce": "#bdeeff", "co": "#94bdff"}
-    VERDICTS = {"ok": "Полное решение", "qu": "В очереди", "te": "Выполняется", "wa": "Неправильный ответ", "tl": "Превышено ограничение по времени", "re": "Ошибка исполнения", "ml": "Превышено ограничение по памяти", "se": "Ошибка тестирующей системы", "ps": "Частичное решение", "ce": "Ошибка компиляции", "co": "Компилируется"}
+    COLORS = {"ok": "#157002", "wa": "#6b0111", "tl": "#828003", "qu": "#000000", "te": "#116bfa", "ps": "#000000",
+              "ce": "#0083b1", "co": "#116bfa"}
+    BCOLORS = {"ok": "#b0eba4", "wa": "#f57d8f", "tl": "#f7f44a", "qu": "#ffffff", "te": "#94bdff", "ps": "#cfd0d1",
+               "ce": "#bdeeff", "co": "#94bdff"}
+    VERDICTS = {"ok": "Полное решение", "qu": "В очереди", "te": "Выполняется", "wa": "Неправильный ответ",
+                "tl": "Превышено ограничение по времени", "re": "Ошибка исполнения",
+                "ml": "Превышено ограничение по памяти", "se": "Ошибка тестирующей системы", "ps": "Частичное решение",
+                "ce": "Ошибка компиляции", "co": "Компилируется"}
     db_sess = db_session.create_session()
     user = db_sess.query(User).filter(User.uid == current_user.uid).first()
     submissions = tuple(filter(lambda x: x.cid == contest, user.submissions))
     contest_title = db_sess.query(Contest).filter(Contest.cid == contest).first().title
-    template = render_template("submissions.html", user=user, colors=COLORS, bcolors=BCOLORS, verdicts=VERDICTS, threads_count=checker.threads_count, max_threads_count=checker.MAX_THREADS_COUNT, queued_count=len(checker.queue), submissions=submissions, contest=contest, contest_title=contest_title, title="Мои посылки", now_time=datetime.datetime.now())
+    template = render_template("submissions.html", user=user, colors=COLORS, bcolors=BCOLORS, verdicts=VERDICTS,
+                               threads_count=checker.threads_count, max_threads_count=checker.MAX_THREADS_COUNT,
+                               queued_count=len(checker.queue), submissions=submissions, contest=contest,
+                               contest_title=contest_title, title="Мои посылки", now_time=datetime.datetime.now())
     db_sess.close()
     return template
 
@@ -943,7 +1094,8 @@ def tasks_function(contest):
     contest = db_sess.query(Contest).filter(Contest.cid == contest).first()
     if datetime.datetime.now() < contest.start_time:
         db_sess.close()
-        return render_template("contest_access_denied.html", title="Доступ запрещён", contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
+        return render_template("contest_access_denied.html", title="Доступ запрещён", contest=contest.cid,
+                               contest_title=contest.title, now_time=datetime.datetime.now())
     if datetime.datetime.now() < contest.start_time:
         return abort(403)
     all_tasks = contest.tasks
@@ -954,7 +1106,8 @@ def tasks_function(contest):
             if submission.verdict.startswith("ok"):
                 cnt += 1
         accs[task.tid] = cnt
-    template = render_template("tasks.html", title="Задачи", tasks=all_tasks, accs=accs, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
+    template = render_template("tasks.html", title="Задачи", tasks=all_tasks, accs=accs, contest=contest.cid,
+                               contest_title=contest.title, now_time=datetime.datetime.now())
     db_sess.close()
     return template
 
@@ -964,7 +1117,8 @@ def tasks_function(contest):
 def contests():
     db_sess = db_session.create_session()
     contests = db_sess.query(Contest).all()
-    template = render_template("contests.html", title="Контесты", contests=contests, now_time=datetime.datetime.now(), contest_title="EContest")
+    template = render_template("contests.html", title="Контесты", contests=contests, now_time=datetime.datetime.now(),
+                               contest_title="EContest")
     db_sess.close()
     return template
 
@@ -993,7 +1147,12 @@ def submission_view(submission_id):
                 points[int(group_test) - 1] = round(group_points, 2)
         group["required_tests"] = list(map(int, group["required_tests"]))
         group_points_all[i] = round(group_points_all[i], 2)
-    template = render_template("submission_view.html", submission=submission, all_groups=all_groups, len_groups=len(all_groups), points=points, group_points_all=group_points_all, verdicts=list(all_verdicts.values()), title=f"Посылка #{submission_id}", contest=submission.cid, contest_title=submission.contest.title, now_time=datetime.datetime.now())
+    print(list(all_verdicts.values()), file=sys.stderr)
+    template = render_template("submission_view.html", submission=submission, all_groups=all_groups,
+                               len_groups=len(all_groups), points=points, group_points_all=group_points_all,
+                               verdicts=list(all_verdicts.values()), title=f"Посылка #{submission_id}",
+                               contest=submission.cid, contest_title=submission.contest.title,
+                               now_time=datetime.datetime.now())
     db_sess.close()
     return template
 
@@ -1047,7 +1206,9 @@ def standings(contest):
     items = list(data.items())
     new_items = [(username, sum(points.values())) for username, points in items]
     new_items.sort(key=lambda x: x[1], reverse=True)
-    template = render_template("standings.html", title="Положение", items=new_items, status=status, runs_string=runs_string, all_delta=all_delta, percent=percent, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now())
+    template = render_template("standings.html", title="Положение", items=new_items, status=status,
+                               runs_string=runs_string, all_delta=all_delta, percent=percent, contest=contest.cid,
+                               contest_title=contest.title, now_time=datetime.datetime.now())
     db_sess.close()
     return template
 
@@ -1101,7 +1262,10 @@ def full_standings(contest):
     new_items = [(user, sum(points.values())) for user, points in data.items()]
     new_items.sort(key=lambda x: x[1], reverse=True)
     all_tasks = db_sess.query(Task).filter(Task.contest_id == contest.cid)
-    template = render_template("full_standings.html", title="Полное положение", status=status, runs_string=runs_string, all_delta=all_delta, percent=percent, items=data, new_items=new_items, contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now(), all_tasks=all_tasks)
+    template = render_template("full_standings.html", title="Полное положение", status=status, runs_string=runs_string,
+                               all_delta=all_delta, percent=percent, items=data, new_items=new_items,
+                               contest=contest.cid, contest_title=contest.title, now_time=datetime.datetime.now(),
+                               all_tasks=all_tasks)
     db_sess.close()
     return template
 
@@ -1109,13 +1273,21 @@ def full_standings(contest):
 @app.route("/contest/<int:contest>/status")
 @limiter.limit("20 per minute")
 def status(contest):
-    COLORS = {"ok": "#157002", "wa": "#6b0111", "tl": "#828003", "qu": "#000000", "te": "#116bfa", "ps": "#000000", "ce": "#0083b1", "co": "#116bfa"}
-    BCOLORS = {"ok": "#b0eba4", "wa": "#f57d8f", "tl": "#f7f44a", "qu": "#ffffff", "te": "#94bdff", "ps": "#cfd0d1", "ce": "#bdeeff", "co": "#94bdff"}
-    VERDICTS = {"ok": "Полное решение", "qu": "В очереди", "te": "Выполняется", "wa": "Неправильный ответ", "tl": "Превышено ограничение по времени", "re": "Ошибка исполнения", "ml": "Превышено ограничение по памяти", "se": "Ошибка тестирующей системы", "ps": "Частичное решение", "ce": "Ошибка компиляции", "co": "Компилируется"}
+    COLORS = {"ok": "#157002", "wa": "#6b0111", "tl": "#828003", "qu": "#000000", "te": "#116bfa", "ps": "#000000",
+              "ce": "#0083b1", "co": "#116bfa"}
+    BCOLORS = {"ok": "#b0eba4", "wa": "#f57d8f", "tl": "#f7f44a", "qu": "#ffffff", "te": "#94bdff", "ps": "#cfd0d1",
+               "ce": "#bdeeff", "co": "#94bdff"}
+    VERDICTS = {"ok": "Полное решение", "qu": "В очереди", "te": "Выполняется", "wa": "Неправильный ответ",
+                "tl": "Превышено ограничение по времени", "re": "Ошибка исполнения",
+                "ml": "Превышено ограничение по памяти", "se": "Ошибка тестирующей системы", "ps": "Частичное решение",
+                "ce": "Ошибка компиляции", "co": "Компилируется"}
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(contest == Contest.cid).first()
     submissions = db_sess.query(Submission).filter(Submission.cid == contest.cid).all()
-    template = render_template("status.html", title="Статус", submissions=submissions, contest=contest.cid, contest_title=contest.title, threads_count=checker.threads_count, max_threads_count=checker.MAX_THREADS_COUNT, queued_count=len(checker.queue), now_time=datetime.datetime.now(), bcolors=BCOLORS, colors=COLORS, verdicts=VERDICTS)
+    template = render_template("status.html", title="Статус", submissions=submissions, contest=contest.cid,
+                               contest_title=contest.title, threads_count=checker.threads_count,
+                               max_threads_count=checker.MAX_THREADS_COUNT, queued_count=len(checker.queue),
+                               now_time=datetime.datetime.now(), bcolors=BCOLORS, colors=COLORS, verdicts=VERDICTS)
     db_sess.close()
     return template
 
@@ -1123,10 +1295,12 @@ def status(contest):
 @app.route("/verdicts_info")
 @limiter.limit("30 per minute")
 def verdicts_info():
-    return render_template("verdicts_info.html", title="Пояснение вердиктов чекера", contest_title="EContest Help", now_time=datetime.datetime.now())
+    return render_template("verdicts_info.html", title="Пояснение вердиктов чекера", contest_title="EContest Help",
+                           now_time=datetime.datetime.now())
 
 
 if __name__ == "__main__":
     db_session.global_init("db/econtest.db")
     app.register_blueprint(blueprint)
+    set_admin("admin")
     app.run(host="0.0.0.0", port=8080)

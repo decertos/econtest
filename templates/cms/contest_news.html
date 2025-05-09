@@ -1,0 +1,23 @@
+{% extends "/cms/contest_base.html" %}
+
+{% block content %}
+<h2 style="text-align: center;">Новости контеста</h2>
+<table style="margin: 0px auto; width: 100%;" class="table1">
+    <tr>
+        <th class="th1">ID</th>
+        <th class="th1">Заголовок</th>
+    </tr>
+    {% for news in all_news %}
+        <tr class="tr1">
+            <td class="td1">{{ news.nid }}</td>
+            <td class="td1"><a href="/cms/news/{{ news.nid }}/index/">{{ news.title }}</a></td>
+        </tr>
+    {% endfor %}
+</table>
+<form method="post" novalidate>
+    <div>
+        {{ form.csrf_token }}
+    </div>
+    {{ form.submit() }}
+</form>
+{% endblock %}

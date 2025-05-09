@@ -8,7 +8,7 @@
         <th class="th1">Название</th>
     </tr>
     {% for contest in contests %}
-    <tr>
+    <tr class="tr1">
         <td class="td1">{{ contest.cid }}</td>
         <td class="td1"><a href="/cms/contest/{{ contest.cid }}/index/">{{ contest.title }}</a></td>
     </tr>

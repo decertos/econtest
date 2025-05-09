@@ -1,1 +1,1 @@
-from . import tasks, users, submissions, contests
+from . import tasks, users, submissions, contests, news

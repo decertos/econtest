@@ -25,6 +25,8 @@ class Task(SqlAlchemyBase, SerializerMixin):
     contest_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey("contests.cid"))
     contest = orm.relationship("Contest")
 
+    points = sqlalchemy.Column(sqlalchemy.Float, default=0)
+
     def get_test_cases(self):
         return json.loads(self.test_cases)
 
