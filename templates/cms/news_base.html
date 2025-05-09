@@ -1,11 +1,9 @@
-<!DOCTYPE HTML>
-<html>
-  <head lang="en">
+<head>
     <meta charset="UTF-8">
     <link rel="stylesheet" type="text/css" href="/static/styles.css">
     <title>EContest CMS</title>
-  </head>
-  <body>
+</head>
+<body>
     <h1 class="title">EContest CMS</h1>
     <hr>
     <nav class="navbar">
@@ -14,19 +12,14 @@
       {% else %}
         <a href="/logout" class="username_a"><b>{{ current_user.login }}</b></a>
       {% endif %}
-      <a href="/cms" class="navbar_a"><b>Главная</b></a>
-      <a href="/cms/task/{{ task_id }}/index/" class="navbar_a"><b>Меню задачи</b></a>
-      <a href="/cms/task/{{ task_id }}/test_groups/" class="navbar_a"><b>Подгруппы</b></a>
-      <a href="/cms/task/{{ task_id }}/tests/" class="navbar_a"><b>Тесты</b></a>
-      <a href="/cms/task/{{ task_id }}/tests/add_test/" class="navbar_a"><b>Добавить тест</b></a>
+      <a href="/cms/" class="navbar_a"><b>Главная</b></a>
+      <a href="/cms/news/{{ news_id }}/index/" class="navbar_a"><b>Меню новости</b></a>
     </nav>
     <hr>
-
     <main role="main" class="container">
       {% block content %}{% endblock %}
       <hr>
       <p>Время на сервере: {{ now_time.strftime("%d.%m.%Y %H:%M:%S") }} (UTC)</p>
       <p>econtest v3.3 (09.05.2025 12:41:34 UTC+4)</p>
     </main>
-  </body>
-</html>
+</body>

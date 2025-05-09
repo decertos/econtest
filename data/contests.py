@@ -1,10 +1,7 @@
-import datetime
-
 import sqlalchemy
 from .db_session import SqlAlchemyBase
 from sqlalchemy import orm
 from sqlalchemy_serializer import SerializerMixin
-import json
 
 
 class Contest(SqlAlchemyBase, SerializerMixin):
@@ -14,6 +11,8 @@ class Contest(SqlAlchemyBase, SerializerMixin):
     title = sqlalchemy.Column(sqlalchemy.String)
     start_time = sqlalchemy.Column(sqlalchemy.DateTime)
     end_time = sqlalchemy.Column(sqlalchemy.DateTime)
+
+    news = orm.relationship("News", back_populates="contest")
 
     tasks = orm.relationship("Task", back_populates="contest")
     submissions = orm.relationship("Submission", back_populates="contest")

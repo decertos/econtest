@@ -5,6 +5,10 @@ class MoveError(Exception):
     pass
 
 
+class RobotImportError(Exception):
+    pass
+
+
 class Robot:
     def __init__(self, field, x, y):
         self.x, self.y = x, y
@@ -108,6 +112,58 @@ class Robot:
         code = new_code.strip("\n").rstrip("\n")
         return code
 
+    def parse_code_new(self, code: str):
+        if "| использовать Робот" in code:
+            raise RobotImportError("Робот не использован")
+
+        code = code.replace("нач", "")
+        code = code.replace("кон", "")
+        code = code.replace("|", "#")
+        code = code.replace("\t", "")
+
+        code = code.replace("использовать Робот", "")
+        code = code.replace("алг", "")
+
+        DIRS = {"вниз": "down", "влево": "left", "вправо": "right", "вверх": "up"}
+        for direction in DIRS:
+            code = code.replace(direction, f"robot.move_{DIRS[direction]}()")
+
+        DIRS = {"снизу свободно": "down", "слева свободно": "left", "справа свободно": "right", "сверху свободно": "up"}
+        for direction in DIRS:
+            code = code.replace(direction, f"robot.free_{DIRS[direction]}()")
+
+        code = code.replace("нц пока", "while")
+        code = code.replace("если", "if")
+        code = code.replace("то", ":")
+        indentation_level = 0
+        new_code = ""
+        for line in code.split("\n"):
+            new_code += "    " * indentation_level + line
+            if "while" in line or "if" in line:
+                if "while" in line:
+                    new_code += ":"
+                indentation_level += 1
+            elif "кц" in line or "все" in line or "всё" in line:
+                indentation_level -= 1
+            new_code += "\n"
+
+        code = new_code
+
+        code = code.replace("кц", "")
+        code = code.replace("все", "")
+        code = code.replace("всё", "")
+
+        code = code.replace(" не ", " not ")
+        code = code.replace(" и ",  " and ")
+        code = code.replace(" или ", " or ")
+
+        code = code.replace("закрасить", "robot.paint()")
+
+        code = code.strip().rstrip()
+        code = code.replace(") :", "):")
+
+        return code
+
 
 class Cell:
     def __init__(self, x, y):
@@ -168,41 +224,75 @@ class Field:
             print()
 
 
-field = Field(8, 8)
-for i in range(4):
-    field.set_wall(i, 0, UP)
-for i in range(5, 7):
-    field.set_wall(i, 0, UP)
-for i in range(3):
-    field.set_wall(6, i, RIGHT)
-for i in range(5, 7):
-    field.set_wall(6, i, RIGHT)
-robot = Robot(field, 0, 0)
-code = robot.parse_code("""использовать Робот
-алг
-нач
+def generate_field(code):
+    """5 5
+wall 1 1 0
+robot 2 2
+wall 1 1"""
+    code_lines = code.split("\n")
+    width, height = map(int, code_lines[0].split())
+    field = Field(width, height)
+    robot = Robot(field, 0, 0)
+    for line in code_lines:
+        args = line.split()
+        x, y = int(args[1]), int(args[2])
+        x, y = x - 1, y - 1
+        action = args[0]
+        if action == "wall":
+            direction = int(args[3])
+            field.set_wall(x, y, direction)
+        elif action == "robot":
+            robot.x = x
+            robot.y = y
+    return field, robot
+
+
+def get_field_answer(field):
+    ans = ""
+    for i in range(field.height):
+        for j in range(field.width):
+            if field.get_cell(j, i).filled:
+                ans += f"{i} {j}\n"
+    return ans
+
+
+if __name__ == "__main__":
+    field = Field(8, 8)
+    for i in range(4):
+        field.set_wall(i, 0, UP)
+    for i in range(5, 7):
+        field.set_wall(i, 0, UP)
+    for i in range(3):
+        field.set_wall(6, i, RIGHT)
+    for i in range(5, 7):
+        field.set_wall(6, i, RIGHT)
+    robot = Robot(field, 0, 0)
+    code = robot.parse_code_new("""использовать Робот
+    алг
+    нач
     нц пока не сверху свободно
-        закрасить
-        вправо
+    закрасить
+    вправо
     кц
     нц пока сверху свободно
-        вправо
+    вправо
     кц
     нц пока справа свободно
-        закрасить 
-        вправо
+    закрасить 
+    вправо
     кц
     нц пока не справа свободно 
-        закрасить
-        вниз
+    закрасить
+    вниз
     кц
     нц пока справа свободно 
-        вниз
+    вниз
     кц
     нц пока не справа свободно 
-        закрасить
-        вниз
+    закрасить
+    вниз
     кц
-кон""")
-exec(code)
-field.print_field(robot)
+    кон""")
+    print(code)
+    exec(code)
+    field.print_field(robot)
