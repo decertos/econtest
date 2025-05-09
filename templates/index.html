@@ -17,6 +17,7 @@
     </tr>
   </table>
   <hr>
+  {% if all_news %}
   <h2 style>Новости</h2>
   <table>
     {% for news in all_news %}
@@ -31,5 +32,6 @@
     </tr>
     {% endfor %}
   </table>
+  {% endif %}
   <p>Вернуться <a href="/">на главную</a> страницу</p>
 {% endblock %}
