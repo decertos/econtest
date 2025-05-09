@@ -1008,7 +1008,7 @@ def get_task_data(task_id):
     db_sess = db_session.create_session()
     task = db_sess.query(Task).filter(Task.tid == task_id).first()
     contest = task.contest
-    if datetime.datetime.now() < task.contest.start_time:
+    if datetime.datetime.now() < task.contest.start_time and not (current_user.is_authenticated and current_user.is_admin):
         db_sess.close()
         return render_template("contest_access_denied", title="Доступ запрещён", contest=contest.cid,
                                contest_title=contest.title, now_time=datetime.datetime.now())
@@ -1031,7 +1031,7 @@ def submit(contest):
     db_sess = db_session.create_session()
     contest_object = db_sess.query(Contest).filter(Contest.cid == contest).first()
     contest_title = contest_object.title
-    if datetime.datetime.now() < contest_object.start_time or contest_object.end_time < datetime.datetime.now():
+    if datetime.datetime.now() < contest_object.start_time or contest_object.end_time < datetime.datetime.now() and not (current_user.is_authenticated and current_user.is_admin):
         db_sess.close()
         return render_template("contest_access_denied.html", title="Доступ запрещён", contest=contest,
                                contest_title=contest_object.title, now_time=datetime.datetime.now())
@@ -1092,7 +1092,7 @@ def get_submissions(contest):
 def tasks_function(contest):
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(Contest.cid == contest).first()
-    if datetime.datetime.now() < contest.start_time:
+    if datetime.datetime.now() < contest.start_time and not (current_user.is_authenticated and current_user.is_admin):
         db_sess.close()
         return render_template("contest_access_denied.html", title="Доступ запрещён", contest=contest.cid,
                                contest_title=contest.title, now_time=datetime.datetime.now())
