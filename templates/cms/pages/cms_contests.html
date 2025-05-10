@@ -1,0 +1,25 @@
+{% extends "/cms/cms_base.html" %}
+
+{% block content %}
+<h2 style="text-align: center">Контесты</h2>
+<table style="margin: 0px auto; width: 100%;" class="table1">
+    <tr>
+        <th class="th1">ID</th>
+        <th class="th1">Название</th>
+    </tr>
+    {% for contest in contests %}
+    <tr class="tr1">
+        <td class="td1">{{ contest.cid }}</td>
+        <td class="td1"><a href="/cms/contest/{{ contest.cid }}/index/">{{ contest.title }}</a></td>
+    </tr>
+    {% endfor %}
+</table>
+<br>
+<form method="post" novalidate>
+    <div>
+        {{ form.csrf_token }}
+    </div>
+    {{ form.submit() }}
+</form>
+<p>Нажмите на ID контеста, чтобы изменить его</p>
+{% endblock %}

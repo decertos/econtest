@@ -1,0 +1,23 @@
+{% extends "/files/client/client_base.html" %}
+
+{% block content %}
+<h1>Регистрация</h1>
+<form action="" method="post" novalidate>
+    <table>
+    <div>
+        {{ form.csrf_token }}
+    </div>
+    {% for field in form if field.name != "csrf_token" %}
+        <tr>
+            <td>{{ field.label() }}</td>
+            <td>{{ field() }}</td>
+
+            {% for error in field.errors %}
+                <div class="error" style="color: #c22134">{{ error }}</div>
+            {% endfor %}
+        </tr>
+    {% endfor %}
+    </table>
+</form>
+<p>Уже зарегистрированы? <a href="/login">Войдите</a></p>
+{% endblock %}

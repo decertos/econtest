@@ -1,0 +1,26 @@
+{% extends "/cms/task/task_base.html" %}
+
+{% block content %}
+<table>
+    <tr>
+        <td>Входные данные</td>
+        <td>Выходные данные</td>
+    </tr>
+    <tr>
+        <td><textarea readonly>{{ in_data }}
+
+Только первые 256 символов</textarea></td>
+        <td><textarea readonly>{{ out_data }}
+
+Только первые 256 символов</textarea></td>
+    </tr>
+</table>
+<form method="post" novalidate>
+    <div>
+        {{ form.csrf_token }}
+    </div>
+    <h2>Удаление теста</h2>
+    <p>Удалится только этот тест к этой задаче</p>
+    {{ form.submit() }}
+</form>
+{% endblock %}

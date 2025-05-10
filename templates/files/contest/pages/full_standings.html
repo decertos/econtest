@@ -1,0 +1,30 @@
+{% extends "/files/contest/contest_base.html" %}
+
+{% block content %}
+<h2 style="text-align: center;">Текущее положение</h2>
+<p style="text-align: center">статус: {{ status }}, {{ runs_string }} из {{ all_delta }} ({{ percent }}%)</p>
+<table style="margin: 0px auto; width: 100%;" class="table1">
+    <tr>
+        <th class="th1">Пользователь</th>
+        {% for task in all_tasks %}
+            <th class="th1">{{ task.tid }}</th>
+        {% endfor %}
+        <th class="th1">Баллы</th>
+    </tr>
+    {% for user, all_points in new_items %}
+        {% set points = items[user] %}
+        <tr class="tr1">
+            <td class="td1">{{ user }}</td>
+            {% for task in all_tasks %}
+                {% if points.get(task.tid, 0.0) == 100 %}
+                    <td class="td1"><strong>{{ points.get(task.tid, "-") }}</strong></td>
+                {% else %}
+                    <td class="td1">{{ points.get(task.tid, "-") }}</td>
+                {% endif %}
+            {% endfor %}
+            <th class="td1">{{ all_points }}</th>
+        </tr>
+    {% endfor %}
+</table>
+<a href="/contest/{{ contest }}/standings">Перейти к положению</a>
+{% endblock %}
