@@ -1,0 +1,27 @@
+{% extends "/cms/task/task_base.html" %}
+
+{% block content %}
+<h2>Подгруппы</h2>
+<table class="table1">
+    <tr>
+        <th class="th1">№</th>
+        <th class="th1">Баллы</th>
+        <th class="th1">Баллы за тест</th>
+        <th class="th1">Тесты (первые 5 символов)</th>
+    </tr>
+    {% for group in groups %}
+    <tr class="tr1">
+        <td class="td1"><a href="/cms/task/{{ task_id }}/test_groups/{{ group[0] }}/">{{ group[0] }}</a></td>
+        <td class="td1">{{ group[1] }}</td>
+        <td class="td1">{{ group[2] }}</td>
+        <td class="td1">{{ group[3] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+<form method="post" novalidate>
+    <div>
+        {{ form.csrf_token }}
+    </div>
+    {{ form.submit() }}
+</form>
+{% endblock %}

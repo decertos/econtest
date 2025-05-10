@@ -1,0 +1,37 @@
+{% extends "/files/contest/contest_base.html" %}
+
+{% block content %}
+    <head>
+        <link rel="stylesheet" type="text/css" href="/static/styles.css">
+        <script>
+MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js">
+</script>
+    </head>
+    <h1 style="text-align: center">{{ task.tid }}. {{ task.title }}</h1>
+    <p style="text-align: center; margin-top: -20px;"><i>Ограничение по времени: </i>{{ task.time_limit }} секунд<br>
+    <i>Ограничение по памяти: </i>{{ task.memory_limit }} МБ</p>
+
+    <p>{{ task.statement|safe }}</p>
+    <h3><b>Формат входных данных</b></h3>
+    <p style="margin-top: -15px;">{{ task.input_spec|safe }}</p>
+    <h3><b>Формат выходных данных</b></h3>
+    <p style="margin-top: -15px;">{{ task.output_spec|safe }}</p>
+
+    <a href="/contest/{{ contest }}/submit?task_id={{ task.tid }}">Отправить решение</a>
+
+    {% if task.mode == 0 %}
+    <i>Эта задача с проверкой до первой ошибки</i>
+    {% elif task.mode == 1 %}
+    <i>Эта задача с проверкой всех тестов</i>
+    {% endif %}
+{% endblock %}
