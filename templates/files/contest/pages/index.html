@@ -1,6 +1,18 @@
 {% extends "/files/contest/contest_base.html" %}
 
 {% block content %}
+<head>
+  <script>
+MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+</head>
   <h2>{{ contest_title }}</h2>
   <table class="table1">
     <tr class="tr1">
@@ -18,13 +30,13 @@
   </table>
   <hr style="margin-top: 20px;">
   {% if all_news %}
-  <h2 style>Новости</h2>
+  <h2>Новости</h2>
   <table style="margin-top: -10px;">
     {% for news in all_news %}
     <tr>
       <td>
-        <h3 style="margin-top: -0px;">{{ news.title }}</h3>
-        <p style="margin-top: -15px;">Автор <b>{{ news.author }}</b>, {{ news.date.strftime("%d.%m.%y %H:%M:%S") }}</p>
+        <h3 style="margin-top: 5px; color: #0049bc;">{{ news.title }}</h3>
+        <p style="margin-top: -10px;">Автор <b>{{ news.author }}</b>, {{ news.date.strftime("%d.%m.%y %H:%M:%S") }}</p>
         <div style="width: 400px; border-left: 3px solid #898989;">
           <p style="margin-left: 10px">{{ news.content|safe }}</p>
         </div>

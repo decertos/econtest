@@ -27,15 +27,31 @@
 }
 
 .navbar_a {
-    padding: 8px;
+    padding: 5px;
     text-align: center;
     text-decoration: none;
     color: #385f3b;
     border-radius: 10px;
+    margin: 0 5px;
+    margin-top: -20px;
+    margin-bottom: -20px;
 }
 
 .navbar {
-    text-align: center;
+    display: flex;
+    justify-content: center !important;
+}
+
+input {
+    border-radius: 5px;
+}
+
+select {
+    border-radius: 5px;
+}
+
+textarea {
+    border-radius: 5px;
 }
 
 .navbar_a:hover {
@@ -49,6 +65,8 @@
     text-decoration: none;
     color: #006600;
     border-radius: 10px;
+    margin-top: -20px;
+    margin-bottom: -20px;
 }
 
 .container {

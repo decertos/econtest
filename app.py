@@ -1,6 +1,7 @@
 from flask import abort, Flask, redirect, render_template, request, jsonify
 import flask
 
+
 from data import db_session
 from data.users import User
 from data.submissions import Submission
@@ -99,7 +100,8 @@ class Checker:
                 tests_points[int(j) - 1] = test_points
         points = 0
 
-        check_code = " ".join(code.split(" "))
+        check_code = " ".join([word for word in code.split(" ") if word])
+        print(code.split(" "), file=sys.stderr)
         if "import os" in check_code or "import subprocess" in check_code or "system" in check_code or "db_session" in check_code:
             verdicts["1"] = (
                 "ce", 0, "restricted words. do not use import os, subprocess or anything to hack the testing system")
@@ -127,7 +129,7 @@ class Checker:
             db_sess.commit()
 
             compile_process = subprocess.run(
-                ["g++", f"check{submission_id}.{language}", "-o", f"submissions/check-cpp{submission_id}.exe", "-std=c++23"],
+                ["g++", f"submissions/check{submission_id}.{language}", "-o", f"submissions/check-cpp{submission_id}.exe", "-std=c++23"],
                 stderr=subprocess.PIPE)
             if compile_process.returncode != 0:
                 verdicts["1"] = ("ce", 0, str(compile_process.stderr))
@@ -137,7 +139,7 @@ class Checker:
             submission.verdicts = json.dumps(verdicts)
             db_sess.commit()
             db_sess.close()
-            commands = [f"check-cpp{submission_id}.exe"]
+            commands = [f"submissions/check-cpp{submission_id}.exe"]
         # Проверка на тестах
         max_execution_time = 0
         for index, test in enumerate(test_cases, start=1):
@@ -251,6 +253,23 @@ def load_user(user_id):
     return ans
 
 
+@app.route("/info")
+def info():
+    if not current_user.is_authenticated or not current_user.is_admin:
+        return abort(403)
+    return """<h3 style="margin-bottom: 0px;">econtest info</h4>
+econtest version 3.5<br>created 11.05.2025 18:28:25 UTC+4<br>
+running on flask 3.1.0 with waitress 3.0.2 on nginx 1.27.5
+<h3 style="margin-bottom: 0px;">warning</h3>
+you are using econtest with bootstrap.<br>if you want to use econtest without it, delete its occurences in "base" html files.<br>
+you can also delete occurrences of highlight.js and the code highlighter in the submit tab."""
+
+
+@app.route("/health")
+def health_check():
+    return "OK", 200
+
+
 class LoginForm(FlaskForm):
     username = StringField("Логин", validators=[DataRequired(message="Это обязательное поле.")])
     password = PasswordField("Пароль", validators=[DataRequired(message="Это обязательное поле.")])
@@ -315,7 +334,7 @@ class ContestDeleteForm(FlaskForm):
 class NewsEditForm(FlaskForm):
     title = StringField("Заголовок")
     author = StringField("Автор")
-    content = StringField("Содержание")
+    content = TextAreaField("Содержание")
     cid = StringField("ID контеста")
     submit1 = SubmitField("Сохранить")
 
@@ -1077,8 +1096,16 @@ def get_submissions(contest):
     db_sess = db_session.create_session()
     user = db_sess.query(User).filter(User.uid == current_user.uid).first()
     submissions = tuple(filter(lambda x: x.cid == contest, user.submissions))
+    page = int(request.args.get("page", 1))
+    max_page = len(submissions) // 10 + (len(submissions) % 10 != 0)
+    if not (0 <= page <= max_page):
+        page = 1
+    if max_page == 0:
+        max_page = 1
+    submissions = submissions[(max_page - page) * 10:(max_page - page + 1) * 10]
     contest_title = db_sess.query(Contest).filter(Contest.cid == contest).first().title
     template = render_template("/files/contest/pages/submissions.html", user=user, colors=COLORS, bcolors=BCOLORS, verdicts=VERDICTS,
+                               page=page, max_page=max_page, prev_page=max(1, page - 1), next_page=min(max_page, page + 1),
                                threads_count=checker.threads_count, max_threads_count=checker.MAX_THREADS_COUNT,
                                queued_count=len(checker.queue), submissions=submissions, contest=contest,
                                contest_title=contest_title, title="Мои посылки", now_time=datetime.datetime.now())
@@ -1146,8 +1173,9 @@ def submission_view(submission_id):
                 points[int(group_test) - 1] = round(group_points, 2)
         group["required_tests"] = list(map(int, group["required_tests"]))
         group_points_all[i] = round(group_points_all[i], 2)
+    languages = {"py3102": "python", "cpp": "cpp", "py3123": "python"}
     template = render_template("/files/contest/pages/submission_view.html", submission=submission, all_groups=all_groups,
-                               len_groups=len(all_groups), points=points, group_points_all=group_points_all,
+                               len_groups=len(all_groups), points=points, group_points_all=group_points_all, language=languages[submission.language],
                                verdicts=list(all_verdicts.values()), title=f"Посылка #{submission_id}",
                                contest=submission.cid, contest_title=submission.contest.title,
                                now_time=datetime.datetime.now())
@@ -1282,7 +1310,15 @@ def status(contest):
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(contest == Contest.cid).first()
     submissions = db_sess.query(Submission).filter(Submission.cid == contest.cid).all()
+    max_page = len(submissions) // 10 + (len(submissions) % 10 != 0)
+    page = int(request.args.get("page", 1))
+    if not (1 <= page <= max_page):
+        page = 1
+    if max_page == 0:
+        max_page = 1
+    submissions = submissions[(max_page - page) * 10:(max_page - page + 1) * 10]
     template = render_template("/files/contest/pages/status.html", title="Статус", submissions=submissions, contest=contest.cid,
+                               prev_page=max(1, page - 1), page=page, next_page=min(max_page, page + 1),
                                contest_title=contest.title, threads_count=checker.threads_count,
                                max_threads_count=checker.MAX_THREADS_COUNT, queued_count=len(checker.queue),
                                now_time=datetime.datetime.now(), bcolors=BCOLORS, colors=COLORS, verdicts=VERDICTS)
@@ -1299,4 +1335,3 @@ def verdicts_info():
 
 db_session.global_init("db/econtest.db")
 app.register_blueprint(blueprint)
-app.run(host="0.0.0.0", port=5000)

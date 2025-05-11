@@ -1,6 +1,15 @@
 {% extends "/files/contest/contest_base.html" %}
 
 {% block content %}
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+<!-- and it's easy to individually load additional languages -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/go.min.js"></script>
+
+<script>hljs.highlightAll();</script>
+</head>
 <h1>Посылка #{{ submission.s_id }}</h1>
 <table>
     <tr><td><i>Язык: </i></td><td>{{ submission.language }}</td></tr>
@@ -11,7 +20,7 @@
     <tr><td><i>Баллы: </i></td><td>{{ submission.points }}</td></tr>
     <tr><td><i>Максимальное <br>время исполнения: </i></td><td>{{ submission.execution_time }} ms</td></tr>
 </table>
-<p><i>Код посылки: </i><textarea readonly>{{ "\n".join(submission.code.split("\n")) }}</textarea></p>
+<p><i>Код посылки: </i><pre><code class="language-{{ language }}">{{ "\n".join(submission.code.split("\n")) }}</code></pre></p>
 <p>Детальная информация о тестах</p>
 <code>
     {% if verdicts[0][0] == "re" or verdicts[0][0] == "ce" %}
