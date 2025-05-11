@@ -24,8 +24,10 @@
     {% endfor %}
     </table>
 </form>
-<script type="module" defer>
-    (async ({ chrome, netscape }) => { if (!chrome && !netscape) await import('https://unpkg.com/@ungap/custom-elements'); const { default: HighlightedCode } = await import('https://unpkg.com/highlighted-code'); HighlightedCode.useTheme('github'); })(self);
+<script type="module" src="/static/addons/code_highlighting_submit/custom_elements.js"></script>
+<script type="module">
+    import HighlightedCode from '/static/addons/code_highlighting_submit/highlighted_code.js';
+    HighlightedCode.useTheme('github');
 </script>
 {% if errors %}
     <p style="color: #f74f4f">Задачи с таким ID не существует</p>

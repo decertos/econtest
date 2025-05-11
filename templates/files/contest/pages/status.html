@@ -31,12 +31,9 @@
 <table>
     <tr>
         <td style="padding: 8px;">Страница: </td>
-        <td style="padding: 8px;"><a href="/contest/{{ contest }}/submissions?page={{ prev_page }}">{{ prev_page }}</a></td>
+        <td style="padding: 8px;"><a href="/contest/{{ contest }}/status?page={{ prev_page }}">{{ prev_page }}</a></td>
         <td style="padding: 8px;">{{ page }}</td>
-        <td style="padding: 8px;"><a href="/contest/{{ contest }}/submissions?page={{ next_page }}">{{ next_page }}</a></td>
+        <td style="padding: 8px;"><a href="/contest/{{ contest }}/status?page={{ next_page }}">{{ next_page }}</a></td>
     </tr>
 </table>
-<p>Пояснение вердиктов чекера: <a href="/verdicts_info">здесь</a><br>
-Сейчас используется потоков для проверки: {{ threads_count }}/{{ max_threads_count }}<br>
-Сейчас решений в очереди: {{ queued_count }}</p>
 {% endblock %}

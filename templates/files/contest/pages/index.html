@@ -2,7 +2,7 @@
 
 {% block content %}
 <head>
-  <script>
+<script>
 MathJax = {
   tex: {
     inlineMath: [['$', '$'], ['\\(', '\\)']]
@@ -11,6 +11,9 @@ MathJax = {
     fontCache: 'global'
   }
 };
+</script>
+<script type="text/javascript" id="MathJax-script" async
+  src="/static/addons/mathjax.js">
 </script>
 </head>
   <h2>{{ contest_title }}</h2>
@@ -35,7 +38,7 @@ MathJax = {
     {% for news in all_news %}
     <tr>
       <td>
-        <h3 style="margin-top: 5px; color: #0049bc;">{{ news.title }}</h3>
+        <h4 style="margin-top: 5px; color: #505050;">{{ news.title }}</h4>
         <p style="margin-top: -10px;">Автор <b>{{ news.author }}</b>, {{ news.date.strftime("%d.%m.%y %H:%M:%S") }}</p>
         <div style="width: 400px; border-left: 3px solid #898989;">
           <p style="margin-left: 10px">{{ news.content|safe }}</p>

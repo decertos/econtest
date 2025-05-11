@@ -13,7 +13,7 @@
             <td>{{ field() }}</td>
 
             {% for error in field.errors %}
-                <div class="error" style="color: #c22134">{{ error }}</div>
+                <tr class="error" style="color: #c22134"><td></td><td>{{ error }}</td></tr>
             {% endfor %}
         </tr>
     {% endfor %}

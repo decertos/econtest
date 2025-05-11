@@ -258,7 +258,7 @@ def info():
     if not current_user.is_authenticated or not current_user.is_admin:
         return abort(403)
     return """<h3 style="margin-bottom: 0px;">econtest info</h4>
-econtest version 3.5<br>created 11.05.2025 18:28:25 UTC+4<br>
+econtest version 3.6<br>created 11.05.2025 21:48:51 UTC+4<br>
 running on flask 3.1.0 with waitress 3.0.2 on nginx 1.27.5
 <h3 style="margin-bottom: 0px;">warning</h3>
 you are using econtest with bootstrap.<br>if you want to use econtest without it, delete its occurences in "base" html files.<br>
@@ -1228,7 +1228,7 @@ def standings(contest):
     for submission in contest.submissions:
         user = submission.user.login
         data[user] = data.get(user, {})
-        data[user][submission.tid] = max(data[user].get(submission.tid, 0.0), submission.points)
+        data[user][submission.tid] = max(data[user].get(submission.tid, 0.0), submission.points if submission.points is not None else 0.0)
     items = list(data.items())
     new_items = [(username, sum(points.values())) for username, points in items]
     new_items.sort(key=lambda x: x[1], reverse=True)
@@ -1284,7 +1284,7 @@ def full_standings(contest):
     for submission in contest.submissions:
         user = submission.user.login
         data[user] = data.get(user, {})
-        data[user][submission.tid] = max(data[user].get(submission.tid, 0.0), submission.points)
+        data[user][submission.tid] = max(data[user].get(submission.tid, 0.0), submission.points if submission.points is not None else 0.0)
     new_items = [(user, sum(points.values())) for user, points in data.items()]
     new_items.sort(key=lambda x: x[1], reverse=True)
     all_tasks = db_sess.query(Task).filter(Task.contest_id == contest.cid)
