@@ -997,7 +997,7 @@ def register_form():
         db_sess.commit()
         db_sess.close()
         return redirect("/contests")
-    return render_template("register.html", title="Регистрация", form=form, contest_title="EContest",
+    return render_template("/files/client/register.html", title="Регистрация", form=form, contest_title="EContest",
                            now_time=datetime.datetime.now())
 
 
@@ -1146,7 +1146,6 @@ def submission_view(submission_id):
                 points[int(group_test) - 1] = round(group_points, 2)
         group["required_tests"] = list(map(int, group["required_tests"]))
         group_points_all[i] = round(group_points_all[i], 2)
-    print(list(all_verdicts.values()), file=sys.stderr)
     template = render_template("/files/contest/pages/submission_view.html", submission=submission, all_groups=all_groups,
                                len_groups=len(all_groups), points=points, group_points_all=group_points_all,
                                verdicts=list(all_verdicts.values()), title=f"Посылка #{submission_id}",
@@ -1298,8 +1297,6 @@ def verdicts_info():
                            now_time=datetime.datetime.now())
 
 
-if __name__ == "__main__":
-    db_session.global_init("db/econtest.db")
-    app.register_blueprint(blueprint)
-    set_admin("admin")
-    app.run(host="0.0.0.0", port=8080)
+db_session.global_init("db/econtest.db")
+app.register_blueprint(blueprint)
+app.run(host="0.0.0.0", port=5000)
