@@ -9,7 +9,7 @@ from sqlalchemy_serializer import SerializerMixin
 class News(SqlAlchemyBase, SerializerMixin):
     __tablename__ = "news"
 
-    nid = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
+    nid = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True, index=True)
     title = sqlalchemy.Column(sqlalchemy.String)
     author = sqlalchemy.Column(sqlalchemy.String)
     date = sqlalchemy.Column(sqlalchemy.DateTime, default=datetime.datetime.now())

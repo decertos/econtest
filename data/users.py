@@ -9,10 +9,11 @@ from sqlalchemy import orm
 class User(SqlAlchemyBase, UserMixin, SerializerMixin):
     __tablename__ = "users"
 
-    uid = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
+    uid = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True, index=True)
     login = sqlalchemy.Column(sqlalchemy.String, unique=True, index=True)
     password = sqlalchemy.Column(sqlalchemy.String)
     is_admin = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
+    banned = sqlalchemy.Column(sqlalchemy.String, default="")
     submissions = orm.relationship("Submission", back_populates="user")
 
     def check_password(self, password):

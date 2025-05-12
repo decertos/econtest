@@ -1,0 +1,45 @@
+{% extends "/cms/cms_base.html" %}
+
+{% block content %}
+<h1>EContest Executor</h1>
+<p><b>EContest Executor</b> - это скрипт для управления некоторыми административными действиями в EContest
+через терминал.</p>
+<h3>Правила запуска</h3>
+<p>Для того, чтобы использовать команду, перейдите в директорию с EContest.<br>
+Затем, напишите python executor.py ... (пишите python/py в зависимости от версии и от названия в PATH)</p>
+<h3>Доступные команды</h3>
+<table class="table1">
+    <tr>
+        <th class="th1">Команда и аргументы</th>
+        <th class="th1">Что делает команда</th>
+    </tr>
+    <tr class="tr1">
+        <td class="td1">set-admin [user]</td>
+        <td class="td1">Сделать пользователя с логином <i>user</i> администратором</td>
+    </tr>
+    <tr class="tr1">
+        <td class="td1">remove-admin [user]</td>
+        <td class="td1">Убрать пользователя с логином <i>user</i> из администраторов</td>
+    </tr>
+    <tr class="tr1">
+        <td class="td1">check-user [user]</td>
+        <td class="td1">Проверить, существует ли пользователь с логином <i>user</i></td>
+    </tr>
+    <tr class="tr1">
+        <td class="td1">remove-user [user]</td>
+        <td class="td1">Удалить пользователя с логином <i>user</i></td>
+    </tr>
+    <tr class="tr1">
+        <td class="td1">ban-user [user]</td>
+        <td class="td1">Забанить пользователя с логином <i>user</i></td>
+    </tr>
+    <tr class="tr1">
+        <td class="td1">unban-user [user]</td>
+        <td class="td1">Разбанить пользователя с логином <i>user</i></td>
+    </tr>
+    <tr class="tr1">
+        <td class="td1">userlist</td>
+        <td class="td1">Вывести список всех пользователей с информацией о них</td>
+    </tr>
+</table>
+{% endblock %}

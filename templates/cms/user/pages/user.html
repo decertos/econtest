@@ -1,0 +1,39 @@
+{% extends "/cms/cms_base.html" %}
+
+{% block content %}
+<h3>Забанить пользователя</h3>
+<form method="post" novalidate>
+    <div>
+        {{ form.csrf_token }}
+    </div>
+    <table>
+    {% for field in form if field.name != "csrf_token" %}
+        <tr>
+        <td>{{ field.label() }}</td>
+        <td>{{ field }}</td>
+    {% for error in field.errors %}
+        <div class="error">{{ error }}</div>
+    {% endfor %}
+    {% endfor %}
+        </tr>
+    </table>
+</form>
+<h3>Разбанить пользователя</h3>
+<form method="post" novalidate>
+    <div>
+        {{ form1.csrf_token }}
+    </div>
+    <table>
+    {% for field in form1 if field.name != "csrf_token" %}
+        <tr>
+        <td>{{ field.label() }}</td>
+        <td>{{ field }}</td>
+        </tr>
+    {% for error in field.errors %}
+        <div class="error">{{ error }}</div>
+    {% endfor %}
+
+    {% endfor %}
+    </table>
+</form>
+{% endblock %}

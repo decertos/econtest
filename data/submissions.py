@@ -8,7 +8,7 @@ from sqlalchemy_serializer import SerializerMixin
 class Submission(SqlAlchemyBase, SerializerMixin):
     __tablename__ = "submissions"
 
-    s_id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
+    s_id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True, index=True)
     language = sqlalchemy.Column(sqlalchemy.String, default="py")
     verdict = sqlalchemy.Column(sqlalchemy.String, default="qu")
 

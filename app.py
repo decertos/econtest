@@ -16,35 +16,34 @@ from wtforms.validators import EqualTo, DataRequired
 
 from flask_login import LoginManager, current_user, login_user, logout_user, login_required
 
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import generate_password_hash
 from werkzeug.exceptions import HTTPException
-from werkzeug.utils import secure_filename
 
 from collections import deque
 import subprocess
 import threading
 import datetime
 from zipfile import ZipFile
-from random import randint
 import time
 import json
-import sys
 import os
 
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-import logging
-
 
 MODE_FULL_CHECK = 0
 MODE_PARTIAL_CHECK = 1
+
+with open("config/config.json", "r", encoding="UTF-8") as f:
+    config_data = json.load(f)
+MAX_THREADS_COUNT = int(config_data["max_threads_count"])
 
 
 class Checker:
     def __init__(self):
         self.queue = deque()
-        self.MAX_THREADS_COUNT = 2
+        self.MAX_THREADS_COUNT = MAX_THREADS_COUNT
         self.threads_count = 0
 
     def check_ended(self, submission_id, verdicts, max_execution_time, verdict):
@@ -101,7 +100,6 @@ class Checker:
         points = 0
 
         check_code = " ".join([word for word in code.split(" ") if word])
-        print(code.split(" "), file=sys.stderr)
         if "import os" in check_code or "import subprocess" in check_code or "system" in check_code or "db_session" in check_code:
             verdicts["1"] = (
                 "ce", 0, "restricted words. do not use import os, subprocess or anything to hack the testing system")
@@ -194,6 +192,8 @@ class Checker:
         else:
             points = submission.task.points
         submission.points = round(points, 2)
+        if points == submission.task.points:
+            submission.task.solved_count += 1
         db_sess.commit()
         db_sess.close()
 
@@ -265,9 +265,12 @@ you are using econtest with bootstrap.<br>if you want to use econtest without it
 you can also delete occurrences of highlight.js and the code highlighter in the submit tab."""
 
 
-@app.route("/health")
-def health_check():
-    return "OK", 200
+@app.before_request
+def before_request():
+    if current_user.is_authenticated and current_user.banned:
+        return f"""<h1 style="text-align: center;">Banned</h1><hr style="margin-top: -10px;">
+<p style="text-align: center">You were permanently banned. Reason: {current_user.banned}."""
+
 
 
 class LoginForm(FlaskForm):
@@ -383,6 +386,16 @@ class AddTaskForm(FlaskForm):
     submit = SubmitField("Добавить задачу")
 
 
+class BanUserForm(FlaskForm):
+    username = StringField("Логин")
+    reason = TextAreaField("Причина")
+    submit1 = SubmitField("Забанить")
+
+class UnbanUserForm(FlaskForm):
+    username = StringField("Логин")
+    submit2 = SubmitField("Разбанить")
+
+
 @app.route("/")
 @app.route("/index")
 def main_page():
@@ -409,7 +422,7 @@ def error_handler(code):
         return redirect("/login")
     if code.startswith("429"):
         rate_limit = code[code.find(":") + 2:]
-        return f'<p>Too many requests. Wait for a minute and try again.<br>Rate limit for this pages is {rate_limit}.</p> <p>Слишком много запросов. Подождите минуту и попробуйте ещё раз.<br>Ограничение запросов на эту страницу: {rate_limit.replace("per", "в").replace("minute", "минуту")}.</p>'
+        return f'<p>Too many requests. <br>Rate limit: {rate_limit}.</p> <p>Слишком много запросов.<br>Ограничение запросов: {rate_limit}.</p>'
     if "/api/" in request.full_path:
         return jsonify({"status": "error", "error": code})
     if "ru" in request.accept_languages:
@@ -423,15 +436,15 @@ def error_handler(code):
 
 # API
 @app.route("/api/")
+@limiter.limit("20 per minute")
 def api():
     return render_template("/files/client/api.html", title="Главная страница", contest_title="EContest API",
                            now_time=datetime.datetime.now())
 
 
-@blueprint.route("/api/contest/", methods=["GET", "POST"])
+@blueprint.route("/api/contest/", methods=["GET"])
+@limiter.limit("1 per minute")
 def api_contests():
-    if request.method == "POST":
-        return jsonify({"status": "error", "error": "method not realized"})
     db_sess = db_session.create_session()
     contests = db_sess.query(Contest).all()
     data = {"status": "ok", "response": {}}
@@ -441,10 +454,9 @@ def api_contests():
     return jsonify(data)
 
 
-@blueprint.route("/api/contest/<int:contest_id>/", methods=["GET", "POST"])
+@blueprint.route("/api/contest/<int:contest_id>/")
+@limiter.limit("10 per minute")
 def api_contests_id(contest_id):
-    if request.method == "POST":
-        return jsonify({"status": "error", "error": "method not realized"})
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(Contest.cid == contest_id).first()
     if not contest:
@@ -455,10 +467,9 @@ def api_contests_id(contest_id):
     return jsonify(data)
 
 
-@blueprint.route("/api/task/", methods=["GET", "POST"])
+@blueprint.route("/api/task/")
+@limiter.limit("1 per minute")
 def api_tasks():
-    if request.method == "POST":
-        return jsonify({"status": "error", "error": "method not realized"})
     db_sess = db_session.create_session()
     tasks = db_sess.query(Task).all()
     data = {"status": "ok", "response": {}}
@@ -470,10 +481,9 @@ def api_tasks():
     return jsonify(data)
 
 
-@blueprint.route("/api/task/<int:task_id>", methods=["GET", "POST"])
+@blueprint.route("/api/task/<int:task_id>")
+@limiter.limit("10 per minute")
 def api_tasks_id(task_id):
-    if request.method == "POST":
-        return jsonify({"status": "error", "error": "method not realized"})
     db_sess = db_session.create_session()
     task = db_sess.query(Task).filter(Task.tid == task_id).first()
     if not task:
@@ -485,6 +495,7 @@ def api_tasks_id(task_id):
 
 
 @blueprint.route("/api/admin/task_test_cases/<int:task_id>/")
+@limiter.limit("20 per minute")
 def api_admin_task_test_cases(task_id):
     if not current_user.is_authenticated or not current_user.is_admin:
         return jsonify({"status": "error", "error": "you are not allowed to enter this resource"})
@@ -500,9 +511,8 @@ def api_admin_task_test_cases(task_id):
 
 
 @blueprint.route("/api/user/")
+@limiter.limit("1 per minute")
 def api_user():
-    if request.method == "POST":
-        return jsonify({"status": "error", "error": "method not realized"})
     db_sess = db_session.create_session()
     users = db_sess.query(User).all()
     data = {"status": "ok", "response": {}}
@@ -513,9 +523,8 @@ def api_user():
 
 
 @blueprint.route("/api/user/<int:user_id>/")
+@limiter.limit("10 per minute")
 def api_user_id(user_id):
-    if request.method == "POST":
-        return jsonify({"status": "error", "error": "method not realized"})
     db_sess = db_session.create_session()
     user = db_sess.query(User).filter(User.uid == user_id).first()
     if not user:
@@ -527,6 +536,7 @@ def api_user_id(user_id):
 
 # Content Management System
 @app.route("/cms/")
+@limiter.limit("30 per minute")
 def cms_main_page():
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -534,6 +544,7 @@ def cms_main_page():
 
 
 @app.route("/cms/tasks/", methods=["GET", "POST"])
+@limiter.limit("30 per minute")
 def cms_tasks():
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -559,6 +570,7 @@ def cms_tasks():
 
 
 @app.route("/cms/task/<int:task_id>/index/", methods=["GET", "POST"])
+@limiter.limit("30 per minute")
 def task_index(task_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -603,6 +615,7 @@ def task_index(task_id):
 
 
 @app.route("/cms/task/<int:task_id>/tests/manual/", methods=["GET", "POST"])
+@limiter.limit("50 per minute")
 def cms_manual_test(task_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -621,6 +634,7 @@ def cms_manual_test(task_id):
 
 
 @app.route("/cms/task/<int:task_id>/test_groups/", methods=["GET", "POST"])
+@limiter.limit("70 per minute")
 def cms_task_test_groups(task_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -661,6 +675,7 @@ def cms_task_test_groups(task_id):
 
 
 @app.route("/cms/news/<int:news_id>/index/", methods=["GET", "POST"])
+@limiter.limit("30 per minute")
 def cms_news_index(news_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -693,6 +708,7 @@ def cms_news_index(news_id):
 
 
 @app.route("/cms/news/")
+@limiter.limit("30 per minute")
 def cms_news():
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -700,6 +716,33 @@ def cms_news():
     all_news = db_sess.query(News).all()
     template = render_template("/cms/pages/cms_news.html", all_news=all_news, now_time=datetime.datetime.now())
     db_sess.close()
+    return template
+
+
+@app.route("/cms/user/", methods=["GET", "POST"])
+def cms_users():
+    form = BanUserForm()
+    form1 = UnbanUserForm()
+    template = render_template("/cms/user/pages/user.html", form=form, form1=form1, now_time=datetime.datetime.now())
+    if form.submit1.data and form.validate():
+        username = form.username.data
+        if not check_user(username):
+            return redirect("/cms/user/")
+        reason = form.reason.data
+        db_sess = db_session.create_session()
+        db_sess.query(User).filter(username == User.login).first().banned = reason
+        db_sess.commit()
+        db_sess.close()
+        return f"Successfully banned user '{username}'"
+    if form1.submit2.data and form1.validate():
+        username = form1.username.data
+        if not check_user(username):
+            return redirect("/cms/user/")
+        db_sess = db_session.create_session()
+        db_sess.query(User).filter(username == User.login).first().banned = ""
+        db_sess.commit()
+        db_sess.close()
+        return f"Successfully unbanned user '{username}'"
     return template
 
 
@@ -711,7 +754,24 @@ def set_admin(username):
     db_sess.close()
 
 
+def remove_admin(username):
+    db_sess = db_session.create_session()
+    user = db_sess.query(User).filter(username == User.login).first()
+    user.is_admin = False
+    db_sess.commit()
+    db_sess.close()
+
+
+def check_user(username):
+    db_sess = db_session.create_session()
+    user = db_sess.query(User).filter(username == User.login).first()
+    if user is None:
+        return False
+    return True
+
+
 @app.route("/cms/task/<int:task_id>/test_groups/<int:test_group_id>/", methods=["GET", "POST"])
+@limiter.limit("70 per minute")
 def cms_task_test_group_edit(task_id, test_group_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -731,9 +791,9 @@ def cms_task_test_group_edit(task_id, test_group_id):
         group_data = {"points": int(form.points.data),
                       "required_tests": list(map(str.rstrip, form.tests.data.split("\n")))}
         scoring = task.get_scoring()
+        task.points += int(form.points.data) - scoring[test_group_id - 1]["points"]
         scoring[test_group_id - 1] = group_data
         task.scoring = json.dumps({"scoring": scoring})
-        task.points += int(form.points.data)
         db_sess.commit()
         db_sess.close()
         return redirect(f"/cms/task/{task_id}/test_groups/{test_group_id}/")
@@ -751,6 +811,7 @@ def cms_task_test_group_edit(task_id, test_group_id):
 
 
 @app.route("/cms/task/<int:task_id>/tests/")
+@limiter.limit("70 per minute")
 def cms_task_tests(task_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -764,6 +825,7 @@ def cms_task_tests(task_id):
 
 
 @app.route("/cms/task/<int:task_id>/tests/<int:test_id>/", methods=["GET", "POST"])
+@limiter.limit("70 per minute")
 def cms_task_tests_view(task_id, test_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -788,6 +850,7 @@ def cms_task_tests_view(task_id, test_id):
 
 
 @app.route("/cms/task/<int:task_id>/tests/archive/", methods=["GET", "POST"])
+@limiter.limit("20 per minute")
 def cms_archive_test(task_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -822,6 +885,7 @@ def cms_archive_test(task_id):
 
 
 @app.route("/cms/task/<int:task_id>/tests/<int:test_id>/")
+@limiter.limit("70 per minute")
 def cms_test_data(task_id, test_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -839,6 +903,7 @@ def cms_test_data(task_id, test_id):
 
 
 @app.route("/cms/task/<int:task_id>/tests/add_test/")
+@limiter.limit("30 per minute")
 def cms_add_test(task_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -846,6 +911,7 @@ def cms_add_test(task_id):
 
 
 @app.route("/cms/contests/", methods=["GET", "POST"])
+@limiter.limit("30 per minute")
 def cms_contests():
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -869,6 +935,7 @@ def cms_contests():
 
 
 @app.route("/cms/contest/<int:contest_id>/index/", methods=["GET", "POST"])
+@limiter.limit("20 per minute")
 def cms_contest_index(contest_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -904,6 +971,7 @@ def cms_contest_index(contest_id):
 
 
 @app.route("/cms/contest/<int:contest_id>/tasks/")
+@limiter.limit("20 per minute")
 def cms_contest_tasks(contest_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -917,6 +985,7 @@ def cms_contest_tasks(contest_id):
 
 
 @app.route("/cms/contest/<int:contest_id>/news/", methods=["GET", "POST"])
+@limiter.limit("20 per minute")
 def cms_contest_news(contest_id):
     if not current_user.is_authenticated or (current_user.is_authenticated and not current_user.is_admin):
         return abort(403)
@@ -1025,14 +1094,14 @@ def register_form():
 def get_task_data(task_id):
     db_sess = db_session.create_session()
     task = db_sess.query(Task).filter(Task.tid == task_id).first()
+    if task is None:
+        db_sess.close()
+        return abort(404)
     contest = task.contest
     if datetime.datetime.now() < task.contest.start_time and not (current_user.is_authenticated and current_user.is_admin):
         db_sess.close()
         return render_template("contest_access_denied", title="Доступ запрещён", contest=contest.cid,
                                contest_title=contest.title, now_time=datetime.datetime.now())
-    if not task:
-        db_sess.close()
-        return abort(404)
     template = render_template("/files/contest/pages/task.html", task=task, title=task.title, contest=contest.cid,
                                contest_title=contest.title, now_time=datetime.datetime.now())
     db_sess.close()
@@ -1048,6 +1117,9 @@ def submit(contest):
         form.task.data = request.args.get("task_id", "")
     db_sess = db_session.create_session()
     contest_object = db_sess.query(Contest).filter(Contest.cid == contest).first()
+    if contest_object is None:
+        db_sess.close()
+        abort(404)
     contest_title = contest_object.title
     if datetime.datetime.now() < contest_object.start_time or contest_object.end_time < datetime.datetime.now() and not (current_user.is_authenticated and current_user.is_admin):
         db_sess.close()
@@ -1095,6 +1167,10 @@ def get_submissions(contest):
                 "ce": "Ошибка компиляции", "co": "Компилируется"}
     db_sess = db_session.create_session()
     user = db_sess.query(User).filter(User.uid == current_user.uid).first()
+    contest = db_sess.query(Contest).filter(Contest.cid == contest)
+    if contest is None:
+        db_sess.close()
+        abort(404)
     submissions = tuple(filter(lambda x: x.cid == contest, user.submissions))
     page = int(request.args.get("page", 1))
     max_page = len(submissions) // 10 + (len(submissions) % 10 != 0)
@@ -1118,6 +1194,9 @@ def get_submissions(contest):
 def tasks_function(contest):
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(Contest.cid == contest).first()
+    if contest is None:
+        db_sess.close()
+        abort(404)
     if datetime.datetime.now() < contest.start_time and not (current_user.is_authenticated and current_user.is_admin):
         db_sess.close()
         return render_template("/files/server/contest_access_denied.html", title="Доступ запрещён", contest=contest.cid,
@@ -1127,11 +1206,7 @@ def tasks_function(contest):
     all_tasks = contest.tasks
     accs = {}
     for task in all_tasks:
-        cnt = 0
-        for submission in task.submissions:
-            if submission.verdict.startswith("ok"):
-                cnt += 1
-        accs[task.tid] = cnt
+        accs[task.tid] = task.solved_count
     template = render_template("/files/contest/pages/tasks.html", title="Задачи", tasks=all_tasks, accs=accs, contest=contest.cid,
                                contest_title=contest.title, now_time=datetime.datetime.now())
     db_sess.close()
@@ -1155,7 +1230,7 @@ def contests():
 def submission_view(submission_id):
     db_sess = db_session.create_session()
     submission = db_sess.query(Submission).filter(Submission.s_id == submission_id).first()
-    if not submission:
+    if submission is None:
         db_sess.close()
         return abort(404)
     if submission.user != current_user:
@@ -1188,6 +1263,9 @@ def submission_view(submission_id):
 def standings(contest):
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(contest == Contest.cid).first()
+    if contest is None:
+        db_sess.close()
+        abort(404)
 
     start_time = contest.start_time
     end_time = contest.end_time
@@ -1244,6 +1322,9 @@ def standings(contest):
 def full_standings(contest):
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(contest == Contest.cid).first()
+    if contest is None:
+        db_sess.close()
+        abort(404)
 
     start_time = contest.start_time
     end_time = contest.end_time
@@ -1309,6 +1390,9 @@ def status(contest):
                 "ce": "Ошибка компиляции", "co": "Компилируется"}
     db_sess = db_session.create_session()
     contest = db_sess.query(Contest).filter(contest == Contest.cid).first()
+    if contest is None:
+        db_sess.close()
+        abort(404)
     submissions = db_sess.query(Submission).filter(Submission.cid == contest.cid).all()
     max_page = len(submissions) // 10 + (len(submissions) % 10 != 0)
     page = int(request.args.get("page", 1))

@@ -1,6 +1,7 @@
 import sqlalchemy
 from .db_session import SqlAlchemyBase
 from sqlalchemy_serializer import SerializerMixin
+from functools import lru_cache
 from sqlalchemy import orm
 import json
 
@@ -8,7 +9,7 @@ import json
 class Task(SqlAlchemyBase, SerializerMixin):
     __tablename__ = "tasks"
 
-    tid = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
+    tid = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True, index=True)
     title = sqlalchemy.Column(sqlalchemy.String)
     statement = sqlalchemy.Column(sqlalchemy.String)
     input_spec = sqlalchemy.Column(sqlalchemy.String)
@@ -26,9 +27,12 @@ class Task(SqlAlchemyBase, SerializerMixin):
     contest = orm.relationship("Contest")
 
     points = sqlalchemy.Column(sqlalchemy.Float, default=0)
+    solved_count = sqlalchemy.Column(sqlalchemy.Integer, default=0)
 
+    @lru_cache(maxsize=32)
     def get_test_cases(self):
         return json.loads(self.test_cases)
 
+    @lru_cache(maxsize=32)
     def get_scoring(self):
         return json.loads(self.scoring)["scoring"]
