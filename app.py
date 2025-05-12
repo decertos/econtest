@@ -1167,7 +1167,8 @@ def get_submissions(contest):
                 "ce": "Ошибка компиляции", "co": "Компилируется"}
     db_sess = db_session.create_session()
     user = db_sess.query(User).filter(User.uid == current_user.uid).first()
-    contest = db_sess.query(Contest).filter(Contest.cid == contest)
+    contest_object = db_sess.query(Contest).filter(Contest.cid == contest).first()
+    contest_title = contest_object.title
     if contest is None:
         db_sess.close()
         abort(404)
@@ -1179,7 +1180,6 @@ def get_submissions(contest):
     if max_page == 0:
         max_page = 1
     submissions = submissions[(max_page - page) * 10:(max_page - page + 1) * 10]
-    contest_title = db_sess.query(Contest).filter(Contest.cid == contest).first().title
     template = render_template("/files/contest/pages/submissions.html", user=user, colors=COLORS, bcolors=BCOLORS, verdicts=VERDICTS,
                                page=page, max_page=max_page, prev_page=max(1, page - 1), next_page=min(max_page, page + 1),
                                threads_count=checker.threads_count, max_threads_count=checker.MAX_THREADS_COUNT,
