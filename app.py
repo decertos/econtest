@@ -1057,8 +1057,10 @@ def login_form():
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
             return redirect("/contests")
+        else:
+            return render_template("/files/client/login.html", title="Вход", form=form, contest_title="EContest", now_time=datetime.datetime.now(), errors=["Неправильные имя пользователя или пароль"])
     return render_template("/files/client/login.html", title="Вход", form=form, contest_title="EContest",
-                           now_time=datetime.datetime.now())
+                           now_time=datetime.datetime.now(), errors=[])
 
 
 @app.route("/logout")
@@ -1080,13 +1082,13 @@ def register_form():
         user_found = db_sess.query(User).filter(User.login == form.username.data).first()
         if user_found is not None:
             db_sess.close()
-            return render_template("/files/client/register.html", title="Регистрация", form=form)
+            return render_template("/files/client/register.html", title="Регистрация", form=form, errors=["Такой пользователь уже существует"], contest_title="EContest", now_time=datetime.datetime.now())
         db_sess.add(user)
         db_sess.commit()
         db_sess.close()
         return redirect("/contests")
     return render_template("/files/client/register.html", title="Регистрация", form=form, contest_title="EContest",
-                           now_time=datetime.datetime.now())
+                           now_time=datetime.datetime.now(), errors=[])
 
 
 @app.route("/task/<int:task_id>")

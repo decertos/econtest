@@ -3,10 +3,21 @@ from data.users import User
 from app import set_admin, remove_admin, check_user
 import sys
 
+
 db_session.global_init("db/econtest.db")
-
-
 commands = sys.argv[1:]
+
+
+if commands[0] == "help" or commands[0] == "-h":
+    print("EContest Commands Executor Help")
+    print("Commands")
+    print("set-admin <username> - Add a user with username <username> to administrators")
+    print("remove-admin <username> - Remove a user with username <username> from administrators")
+    print("check-user <username> - Check if a user with username <username> exists")
+    print("remove-user <username> - Remove a user with username <username>")
+    print("ban-user <username> <reason> - Ban a user with username <username> with reason <reason>")
+    print("unban-user <username> - Unban a user with username <username>")
+    print("userlist - Get a list of users")
 if commands[0] == "set-admin":
     if len(commands) == 1:
         print("error: this command requires a 'user' argument")
@@ -26,6 +37,7 @@ elif commands[0] == "remove-admin":
     if not check_user(username):
         print(f"error: no such user: '{username}'")
         exit(0)
+    remove_admin(username)
     print(f"successfully removed '{username}' from administrators")
 elif commands[0] == "check-user":
     if len(commands) == 1:

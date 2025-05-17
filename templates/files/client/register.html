@@ -19,5 +19,8 @@
     {% endfor %}
     </table>
 </form>
+{% for error in errors %}
+<div style="color: #ff4444; margin-top: -5px;">{{ error }}</div>
+{% endfor %}
 <p>Уже зарегистрированы? <a href="/login">Войдите</a></p>
 {% endblock %}
