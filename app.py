@@ -1038,7 +1038,7 @@ def index_page(contest):
         runs_string += f"{days}:"
     runs_string += f"{seconds // 3600}:{str((seconds // 60) % 60).zfill(2)}:{str(seconds % 60).zfill(2)}"
 
-    all_news = db_sess.query(News).filter(News.cid == contest_id).all()
+    all_news = db_sess.query(News).filter(News.cid == contest).all()
     template = render_template("/files/contest/pages/index.html", title="EContest", start_time=start_time, end_time=end_time, status=status, all_news=all_news[::-1],
                                runs_string=runs_string, contest=contest, contest_title=contest_title,
                                now_time=datetime.datetime.now())
