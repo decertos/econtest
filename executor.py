@@ -7,8 +7,14 @@ import sys
 db_session.global_init("db/econtest.db")
 commands = sys.argv[1:]
 
+if len(commands) == 0:
+    print("no command given")
+    exit(0)
 
 if commands[0] == "help" or commands[0] == "-h":
+    if len(commands) > 1:
+        print(f"too much arguments for this command: {len(commands) - 1} instead of 0")
+        exit(0)
     print("EContest Commands Executor Help")
     print("Commands")
     print("set-admin <username> - Add a user with username <username> to administrators")
@@ -22,6 +28,9 @@ if commands[0] == "set-admin":
     if len(commands) == 1:
         print("error: this command requires a 'user' argument")
         exit(0)
+    if len(commands) > 2:
+        print(f"too much arguments for this command: {len(commands) - 1} instead of 1")
+        exit(0)
     username = commands[1]
     if not check_user(username):
         print(f"error: no such user: '{username}'")
@@ -33,6 +42,9 @@ elif commands[0] == "remove-admin":
     if len(commands) == 1:
         print("error: this command requires a 'user' argument")
         exit(0)
+    if len(commands) > 2:
+        print(f"too much arguments for this command: {len(commands) - 1} instead of 1")
+        exit(0)
     username = commands[1]
     if not check_user(username):
         print(f"error: no such user: '{username}'")
@@ -43,6 +55,9 @@ elif commands[0] == "check-user":
     if len(commands) == 1:
         print("error: this command requires a 'user' argument")
         exit(0)
+    if len(commands) > 2:
+        print(f"too much arguments for this command: {len(commands) - 1} instead of 1")
+        exit(0)
     username = commands[1]
     if not check_user(username):
         print(f"user '{username}' does not exits")
@@ -51,6 +66,9 @@ elif commands[0] == "check-user":
 elif commands[0] == "remove-user":
     if len(commands) == 1:
         print("error: this command requires a 'user' argument")
+        exit(0)
+    if len(commands) > 2:
+        print(f"too much arguments for this command: {len(commands) - 1} instead of 1")
         exit(0)
     username = commands[1]
     if not check_user(username):
@@ -61,7 +79,10 @@ elif commands[0] == "remove-user":
     print(f"successfully deleted user with username '{username}'")
 elif commands[0] == "ban-user":
     if len(commands) < 3:
-        print("error: this command requires a 'user' argument and a 'reason' argument")
+        print(f"not enough arguments for this command: {len(commands) - 1} instead of 2")
+        exit(0)
+    if len(commands) > 2:
+        print(f"too much arguments for this command: {len(commands) - 1} instead of 2")
         exit(0)
     username = commands[1]
     if not check_user(username):
@@ -77,6 +98,9 @@ elif commands[0] == "unban-user":
     if len(commands) == 1:
         print("error: this command requires a 'user' argument")
         exit(0)
+    if len(commands) > 2:
+        print(f"too much arguments for this command: {len(commands) - 1} instead of 1")
+        exit(0)
     username = commands[1]
     if not check_user(username):
         print(f"error: no such user: '{username}'")
@@ -87,6 +111,9 @@ elif commands[0] == "unban-user":
     db_sess.close()
     print(f"successfully unbanned user with username '{username}'")
 elif commands[0] == "userlist":
+    if len(commands) > 1:
+        print(f"too much arguments for this command: {len(commands) - 1} instead of 0")
+        exit(0)
     db_sess = db_session.create_session()
     users = db_sess.query(User).all()
     for user in users:
